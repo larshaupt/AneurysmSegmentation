@@ -1,0 +1,16 @@
+pre_trained/
+data_analysis/*
+results/*
+wandb/*
+data_analysis/*
+sbatch_logs/*
+predictions/*
+__pycache__
+.vscode
+pre_trained/*
+wand/*
+predictions/*
+runs/*
+old_files/sbatch_logs/*
+data/__pycache__/*
+USZ_BrainArtery.code-workspace
