@@ -116,7 +116,7 @@ class Options:
             print(e)
 
     def parse_arguments(self):
-
+        pdb.set_trace()
         self.parser = argparse.ArgumentParser(description="Script for training")
         self.parser.add_argument("-ex", "--exp_path", type=str, default='', help="Path to experiment config file")
 
@@ -128,7 +128,7 @@ class Options:
         self.parser.add_argument('--tags', nargs='+', type=str, default=['simple'])
 
         self.parser.add_argument('--num_workers', type=int, default=0, help='number of workers')
-        self.parser.add_argument('--debug',type=bool, default=False, help='Debugging')
+        self.parser.add_argument('--debug',choices=('True','False'), default='False', help='Debugging')
 
         self.parser.add_argument('--dataset', default='USZ_hdf5d2', help='dataset name')
         self.parser.add_argument('--path_data', default='', help='path_data')
@@ -139,24 +139,24 @@ class Options:
         self.parser.add_argument('--training_dataset', default='train', help='dataset name')
         self.parser.add_argument('--validation_dataset', default='val', help='dataset name')
         self.parser.add_argument('--test_dataset', default='test', help='dataset name')
-        self.parser.add_argument('--grid_validation', type=bool, default=False, help='Use grid patching for validation?')
-        self.parser.add_argument('--compute_mdice', type=bool, default=False, help='Compute Multiclass Dice? Needs more memory')
+        self.parser.add_argument('--grid_validation', choices=('True','False'), default='False', help='Use grid patching for validation?')
+        self.parser.add_argument('--compute_mdice', choices=('True','False'), default='False', help='Compute Multiclass Dice? Needs more memory')
         self.parser.add_argument('--metric_training', type=str, default="full", help='Options are full, reduced, none')
 
 
-        self.parser.add_argument('--shuffle_train',type=bool, default=True, help='shuffle_train')
-        self.parser.add_argument('--shuffle_validation',type=bool, default=False, help='shuffle_validation')
-        self.parser.add_argument('--shuffle_test',type=bool, default=False, help='shuffle_test')
+        self.parser.add_argument('--shuffle_train',choices=('True','False'), default='True', help='shuffle_train')
+        self.parser.add_argument('--shuffle_validation',choices=('True','False'), default='False', help='shuffle_validation')
+        self.parser.add_argument('--shuffle_test',choices=('True','False'), default='False', help='shuffle_test')
 
         self.parser.add_argument('--batch_size_val', type=int, default=1, help='val. input batch size')
         self.parser.add_argument('--batch_size', type=int, default=2, help=' input batch size')
         self.parser.add_argument('--fold_id', type=int, default=0, help='fold id')
         self.parser.add_argument('--num_training_files', type=int, default=-1, help='num_training_files')
-        self.parser.add_argument('--k_fold',type=bool, default=False, help='Doing k-fold?')
+        self.parser.add_argument('--k_fold',choices=('True','False'), default='False', help='Doing k-fold?')
         self.parser.add_argument('--k_fold_k', type=int, default = 5)
         
         self.parser.add_argument('--num_classes', type=int, default=1, help=' number of classes')
-        self.parser.add_argument('--collapse_classes', type=bool, default=False, help='Wether to collapse multiple classes into one')
+        self.parser.add_argument('--collapse_classes', choices=('True','False'), default='False', help='Wether to collapse multiple classes into one')
         self.parser.add_argument('--pretrained_weights', default='', help='path to pretrained_weights')
 
         self.parser.add_argument('--loss', default='weightedBCE', help='loss')
@@ -164,7 +164,7 @@ class Options:
         self.parser.add_argument('--lr_scheduler', default='reduce', help='Which learning rate scheduler')
         self.parser.add_argument('--lambda_loss', type=float, default=1.0, help=' lambda loss')
         self.parser.add_argument('--weight_decay', type=float, default=0.0, help=' lambda loss')
-        self.parser.add_argument('--early_stopping',type=bool, default=False, help='Doing early stopping')
+        self.parser.add_argument('--early_stopping',choices=('True','False'), default='False', help='Doing early stopping')
         self.parser.add_argument('--patience', type=int, default=50, help=' patience')
         self.parser.add_argument('--number_of_epoch', type=int, default=300, help=' number of epochs')
         self.parser.add_argument('--optimizer', type=str, default='adam', help=' Optimizer')
@@ -179,30 +179,34 @@ class Options:
         self.parser.add_argument('--patch_size_x', type=int, default=192, help=' x patch size')
         self.parser.add_argument('--patch_size_y', type=int, default=192, help=' y patch size')
         self.parser.add_argument('--patch_size_z', type=int, default=96, help=' z patch size')
-        self.parser.add_argument('--validate_whole_vol',type=bool, default=False)
-        self.parser.add_argument('--train_whole_volume', type=bool, default=False)
-        self.parser.add_argument('--only_foreground',type=bool, default=False)
+        self.parser.add_argument('--validate_whole_vol', choices=('True','False'), default='False')
+        self.parser.add_argument('--train_whole_vol', choices=('True','False'))
+        self.parser.add_argument('--only_foreground',choices=('True','False'), default='False')
         self.parser.add_argument('--foreground_probability', type=float, default=0.75)
-        self.parser.add_argument('--extra_cropping',type=bool, default=False)
+        self.parser.add_argument('--extra_cropping',choices=('True','False'), default='False')
         self.parser.add_argument('--augment_probability', type=float, default=0.1)
         self.parser.add_argument('--patch_add', type=int, default=0)
         self.parser.add_argument('--patch_xy_add', type=int, default=0)
-        self.parser.add_argument('--crop_sides',type=bool, default=False)
-        self.parser.add_argument('--rand_affine',type=bool, default=True)
+        self.parser.add_argument('--crop_sides',choices=('True','False'), default='False')
+        self.parser.add_argument('--rand_affine',choices=('True','False'), default='True')
 
         self.parser.add_argument('--model_name', type=str, default='UNet', help='name of model')
         self.parser.add_argument('--dropout', type=float, default=0.0, help='dropout rate')
 
 
         self.inp = self.parser.parse_args()
+        
 
     def interpret_params(self):
+
+        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine"]:
+            vars(self.opt)[el] = eval(vars(self.opt)[el])
         #################### GENERAL PARAMETERS ####################
         timestamp = int(time.time())
         self.opt.experiment_name = '%s_sweep_%d'%(self.opt.dataset, timestamp)
         self.opt.experiment_group_name = self.opt.experiment_name
         self.opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+        pdb.set_trace()
         if self.opt.path_data == "":
             self.opt.path_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/%s/data/'%(self.opt.dataset)
         if self.opt.path_split == "":
