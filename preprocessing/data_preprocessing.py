@@ -211,7 +211,7 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
         elif save_as == "nifti":
             nib.save(nii_y_img,path_to_saved_y_file + ".nii.gz" )
 
-    if include_mask:
+    if include_mask and (not os.path.exists(path_to_saved_mask) or overwrite):
         if preprocessed:
             nii_mask = mri_file['mask']
 
@@ -261,8 +261,8 @@ def run_process(every_n = 4, start_i = 0):
         )
 
 ps = []
-n = 8
-split_dif = 8
+n = 2
+split_dif = n
 split_id = 0
 for k in range(split_id*split_dif, split_dif*(split_id+1)):
     ps.append(multiprocessing.Process(target=run_process, args = (n,k,)))
