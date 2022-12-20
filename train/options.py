@@ -153,7 +153,7 @@ class Options:
         self.parser.add_argument('--fold_id', type=int, default=0, help='fold id')
         self.parser.add_argument('--num_training_files', type=int, default=-1, help='num_training_files')
         self.parser.add_argument('--k_fold',type=bool, default=False, help='Doing k-fold?')
-        self.parser.add_argument('--k_fold_k', dtype=int, default = 5)
+        self.parser.add_argument('--k_fold_k', type=int, default = 5)
         
         self.parser.add_argument('--num_classes', type=int, default=1, help=' number of classes')
         self.parser.add_argument('--collapse_classes', type=bool, default=False, help='Wether to collapse multiple classes into one')
