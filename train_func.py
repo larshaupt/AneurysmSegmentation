@@ -32,7 +32,7 @@ def _train(exp_config, model, loader_train, epoch, device, optimizer, criterion_
     print('Training epoch ', str(epoch))
     with tqdm(loader_train, unit='batch') as tepoch:
         #timer.take_time('Load Data')
-        for data, target, norm_params, name in tepoch:
+        for data, target, mask, norm_params, name in tepoch:
             #timer.take_time('Feed through network')
             data, target, norm_params = data.to(device).float(), target.to(device).float(), norm_params.to(device)
             optimizer.zero_grad()
@@ -84,7 +84,7 @@ def _validate(exp_config, model, loader_val, epoch, device, val_loss, logger):
         
 
         with tqdm(loader_val, unit='batch') as tepoch:
-            for data, target, norm_params, name in tepoch:
+            for data, target, mask, norm_params, name in tepoch:
                 data, target, norm_params = data.float().to(device), target.float().to(device), norm_params
 
                 if exp_config.grid_validation:

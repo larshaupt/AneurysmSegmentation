@@ -19,6 +19,7 @@ class HDF5Dataset3D(data.Dataset):
         super().__init__()
         self.transform = transform
         self.main_path = path
+        self.mask_path = mask_path
         self.reduce_len = reduce_len # for debugging, used in __len__
 
 
@@ -45,7 +46,7 @@ class HDF5Dataset3D(data.Dataset):
         self.image_paths.sort()
         self.target_paths.sort()
         if self.mask_path != "":
-            self.mask_path.sort()
+            self.mask_paths.sort()
 
 
         path_data_dict = os.path.join(path, 'file_dict.csv')
@@ -62,12 +63,15 @@ class HDF5Dataset3D(data.Dataset):
 
         reader_image = h5py.File(self.image_paths[index], 'r')
         reader_target = h5py.File(self.target_paths[index], 'r')
-        reader_mask = h5py.File(self.mask_paths[index], 'r')
-
+        
         x = reader_image['data'][()]
         y = reader_target['data'][()]
         if self.mask_path != "":
+            reader_mask = h5py.File(self.mask_paths[index], 'r')
             mask = reader_mask['data'][()]
+            mask = mask.astype(np.bool)
+        else:
+            mask = []
 
         patient_name_current = os.path.basename(self.image_paths[index])[:-3]
 
@@ -83,6 +87,7 @@ class HDF5Dataset3D(data.Dataset):
 
         x = x.astype(np.float32)
         y = y.astype(np.int8)
+        
         if x.ndim == 3:
             x = np.expand_dims(x,axis=0)
         if y.ndim == 3:

@@ -32,8 +32,9 @@ class ToTensor(object):
         target = target.type(torch.int8)
         target = target.to(self.device)
 
-
-        return {'image': image, 'target': target}
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 class ComposeTransforms:
 
@@ -126,7 +127,9 @@ class RandRotate(object):
         image = np.squeeze(image)
         target = np.squeeze(target)
         
-        return {'image': image, 'target': target}
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 # =======================
 # Randomly flips image and label around x or y axis with same probability
@@ -142,7 +145,10 @@ class RandomFlip(object):
         image, target = sample['image'], sample['target']
         image = self.flip(image, randomize=True).as_tensor()
         target = self.flip(target, randomize=False).as_tensor()
-        return {'image': image, 'target': target}
+
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 # =======================
 # Scales image and label using a random zoom_factor between [0.5, 1.5]
@@ -202,7 +208,9 @@ class ScaleByAFactor(object):
         # seg = np.squeeze(seg)
         
         # return {'image': image, 'target': target, 'seg': seg}
-        return {'image': image, 'target': target}
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 # =======================
 # Randomly crop a region with a specified size from the image and label.
@@ -223,7 +231,9 @@ class CropRandom(object):
         if torch.rand(1).item() < self.prob:
             image = self.crop(image, randomize=True).as_tensor()
             target = self.crop(target, randomize=False).as_tensor()
-        return {'image': image, 'target': target}
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 
 # =======================
@@ -316,7 +326,8 @@ class BinarizeSingleLabel(object):
         image, target = sample['image'], sample['target']
 
         target = np.where(target==self.label, 1, 0)
-        return {'image': image, 'target': target}
+        sample['target'] = target
+        return sample
 
 class BinarizeSingleLabelTorch(object):
     def __init__(self, label=4):
@@ -325,7 +336,8 @@ class BinarizeSingleLabelTorch(object):
         image, target = sample['image'], sample['target']
         
         target = torch.where(target==self.label, 1, 0).float()
-        return {'image': image, 'target': target}
+        sample['target'] = target
+        return sample
 
 
     
@@ -340,7 +352,8 @@ class CollapseLabelsTorch(object):
         image, target = sample['image'], sample['target']
         for label in self.labels_to_collapse:
             target = torch.where(target==label, self.target_label, target)
-        return {'image': image, 'target': target}
+        sample['target'] = target
+        return sample
 
 class MapLabelTorch(object):
     def __init__(self, label_origin:int, label_target:int) -> None:
@@ -350,7 +363,8 @@ class MapLabelTorch(object):
     def __call__(self, sample) -> dict:
         image, target = sample['image'], sample['target']
         target = torch.where(target==self.label_origin,  self.label_target, target)
-        return {'image': image, 'target': target}
+        sample['target'] = target
+        return sample
 
 
 class BinarizeAllLabel(object):
@@ -360,7 +374,9 @@ class BinarizeAllLabel(object):
         image, target = sample['image'], sample['target']
 
         target = np.where(target!= 0, 1, 0)
-        return {'image': image, 'target': target}
+
+        sample['target'] = target
+        return sample
 
 class BinarizeAllLabelTorch(object):
     def __init__(self):
@@ -369,7 +385,9 @@ class BinarizeAllLabelTorch(object):
         image, target = sample['image'], sample['target']
 
         target = torch.where(target!= 0, 1, 0)
-        return {'image': image, 'target': target}
+
+        sample['target'] = target
+        return sample
 
 class OneHotEncodeLabel(object):
     def __init__(self, num_classes=1) -> None:
@@ -382,7 +400,9 @@ class OneHotEncodeLabel(object):
         elif isinstance(target, np.ndarray):
             target_new = torch.movedim(torch.nn.functional.one_hot(torch.from_numpy(target.astype("long")), self.num_classes),-1,1).squeeze(0)
             target_new = target_new.detach().numpy().astype(bool)
-        return {'image': image, 'target': target_new}
+
+        sample['target'] = target_new
+        return sample
 
 
 
@@ -400,7 +420,9 @@ class MinMaxNormalizer(object):
         max_mask = np.where(image> self.max_value)
         image[max_mask] = self.max_value
 
-        return {'image': image, 'target': target}
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 
 class Downsample(object):
@@ -413,8 +435,9 @@ class Downsample(object):
         image = torch.nn.functional.interpolate(image, size = self.output_size, mode='trilinear')
         target =  torch.nn.functional.interpolate(target, size = self.output_size, mode='nearest')
 
-        return {'image': torch.squeeze(image,0), 'target': torch.squeeze(target,0)}
-
+        sample['image'] = torch.squeeze(image,0)
+        sample['target'] = torch.squeeze(target,0)
+        return sample
 
 class CropSides(object):
     def __init__(self, crop_size) -> None:
@@ -436,7 +459,9 @@ class CropSides(object):
         image = image[...,back: top + new_shape[0], left : left+ new_shape[1], back : back+new_shape[2]]
         target = target[...,back: top + new_shape[0], left : left+ new_shape[1], back : back+new_shape[2]]
 
-        return {'image': image, 'target': target}
+        sample['image'] = image
+        sample['target'] = target
+        return sample
         
 
 class DownsampleByScale(object):
@@ -449,7 +474,10 @@ class DownsampleByScale(object):
         image = torch.nn.functional.interpolate(image, scale_factor= self.scale_factor, mode='trilinear')
         target =  torch.nn.functional.interpolate(target, scale_factor= self.scale_factor, mode='nearest')
 
-        return {'image': torch.squeeze(image,0), 'target': torch.squeeze(target,0)}
+
+        sample['image'] = torch.squeeze(image,0)
+        sample['target'] = torch.squeeze(target,0)
+        return sample
 
 
 class Pad_to(object):
@@ -462,7 +490,9 @@ class Pad_to(object):
         image = pad(image).as_tensor()
         target = pad(target).as_tensor()
         #print(image.shape, self.size)
-        return {'image': torch.squeeze(image,0), 'target': torch.squeeze(target,0)}
+        sample['image'] = torch.squeeze(image,0)
+        sample['target'] = torch.squeeze(target,0)
+        return sample
 
 
 class RandomRotate90(object):
@@ -480,7 +510,9 @@ class RandomRotate90(object):
         target = self.rand_xy(self.rand_xz(self.rand_yz(target, randomize=False), randomize=False), randomize=False).as_tensor()
 
 
-        return {'image': image, 'target': target}
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 
 class CropForeground(object):
@@ -506,7 +538,10 @@ class CropForeground(object):
 
         image = self.crop(image, weight_map=weight_map, randomize=True)[0].as_tensor()
         target = self.crop(target, weight_map=weight_map, randomize=False)[0].as_tensor()
-        return {'image': image, 'target': target}
+
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 
 
@@ -540,7 +575,9 @@ class CropCenter(object):
         image, target = sample['image'], sample['target']
         image = self.crop(image).as_tensor()
         target = self.crop(target).as_tensor()
-        return {'image': image, 'target': target}
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 
 class TransformTargetToMulitclass(object):
@@ -550,7 +587,8 @@ class TransformTargetToMulitclass(object):
     def __call__(self, sample:dict) -> dict:
         image, target = sample['image'], sample['target']
         target = torch.cat([target, (1-target).to(target.device)], dim=0)
-        return {'image': image, 'target': target}
+        sample['target'] = target
+        return sample
     
 
 
@@ -562,7 +600,10 @@ class PadToDivisible(object):
         image, target = sample['image'], sample['target']
         image = self.pad(image).as_tensor()
         target = self.pad(target).as_tensor()
-        return {'image': image, 'target': target}
+
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 class RandGaussianNoise(object):
     def __init__(self, prob=0.1, std=0.1) -> None:
@@ -573,7 +614,9 @@ class RandGaussianNoise(object):
     def __call__(self, sample:dict) -> dict:
         image, target = sample['image'], sample['target']
         image = self.noise(image).as_tensor()
-        return {'image': image, 'target': target}
+        sample['image'] = image
+
+        return sample
 
 class RandElastic(object):
 
@@ -587,7 +630,9 @@ class RandElastic(object):
         image, target = sample['image'], sample['target']
         target = self.elastic(target, mode= "nearest", randomize=True).as_tensor().to(torch.int8)
         image = self.elastic(image, mode= "bilinear", randomize=False).as_tensor()
-        return {'image': image, 'target': target}
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 class RandAffine(object):
     def __init__(self, scales=(0.9, 1.2), degrees = 15, prob=0.1) -> None:
@@ -602,7 +647,10 @@ class RandAffine(object):
             subject = tio.Subject(image= tio.ScalarImage(tensor=image), target = tio.LabelMap(tensor=target))
             subject = self.affine(subject)
             image, target = subject["image"].data, subject["target"].data
-        return {'image': image, 'target': target}
+
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 
 class CropSidesThreshold(object):
@@ -616,7 +664,10 @@ class CropSidesThreshold(object):
         crop_borders = crop_till_threshold(image, threshold = 1.0, smooth = self.smooth)
         image = crop(image, crop_borders)
         target = crop(target, crop_borders)
-        return {'image': image, 'target': target}
+
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 
 class MaskOutSidesThreshold(object):
@@ -628,7 +679,10 @@ class MaskOutSidesThreshold(object):
         crop_borders = crop_till_threshold(image, threshold = 1.0, smooth = self.smooth)
         image = mask_out(image, crop_borders)
         target = mask_out(target, crop_borders)
-        return {'image': image, 'target': target}
+
+        sample['image'] = image
+        sample['target'] = target
+        return sample
 
 def crop(img, crop_borders):
     assert img.ndim == 3 or img.ndim == 4
@@ -639,6 +693,7 @@ def crop(img, crop_borders):
         return img.squeeze(0)
     else:
         return img
+
 
 def mask_out(img, crop_borders):
     assert img.ndim == 3 or img.ndim == 4
