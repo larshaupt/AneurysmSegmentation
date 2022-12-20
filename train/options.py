@@ -258,7 +258,7 @@ class Options:
         self.opt.tf_train = transformations.ComposeTransforms([
                 transformations.ToTensor(),  
                 transformations.CropSidesThreshold() if self.opt.crop_sides else None,
-                None if self.opt.train_whole_volume else transformations.CropForeground(patch_size_train, label=old_target_label) if self.opt.only_foreground else transformations.CropForegroundBackground(patch_size_train,prob_foreground=self.opt.foreground_probability, label=self.opt.target_label),
+                None if self.opt.train_whole_vol else transformations.CropForeground(patch_size_train, label=old_target_label) if self.opt.only_foreground else transformations.CropForegroundBackground(patch_size_train,prob_foreground=self.opt.foreground_probability, label=self.opt.target_label),
                 transformations.CropRandom((np.array(patch_size_train)/2).astype(int), prob= self.opt.augment_probability) if self.opt.extra_cropping else None,
                 transformations.PadToDivisible(16),
                 transformations.RandAffine() if self.opt.rand_affine else None,
