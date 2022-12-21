@@ -312,7 +312,10 @@ class Options:
         elif self.opt.loss.lower() =='sweeploss':
             self.opt.criterion_loss = MixSweepLoss([nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([self.opt.positive_weight]).to(self.opt.device)), FocalDiceLoss()], [1.0,0.0])
         elif self.opt.loss.lower() == 'softdiceloss':
-            self.opt.criterion_loss = monai.losses.GeneralizedDiceLoss(include_background=True, to_onehot_y=True, sigmoid=True, reduction='mean')
+            if self.opt.num_classes == 1:
+                self.opt.criterion_loss = monai.losses.GeneralizedDiceLoss(include_background=True, to_onehot_y=True, sigmoid=True, reduction='mean')
+            else:
+                self.opt.criterion_loss = monai.losses.GeneralizedDiceLoss(include_background=False, to_onehot_y=True, sigmoid=True, reduction='mean')
         else: 
             raise NotImplementedError(f'Loss {self.opt.loss} is not implemented')
 
