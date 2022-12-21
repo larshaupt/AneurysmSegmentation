@@ -180,7 +180,7 @@ class Options:
         self.parser.add_argument('--patch_size_y', type=int, default=192, help=' y patch size')
         self.parser.add_argument('--patch_size_z', type=int, default=96, help=' z patch size')
         self.parser.add_argument('--validate_whole_vol', choices=('True','False'), default='False')
-        self.parser.add_argument('--train_whole_vol', choices=('True','False'))
+        self.parser.add_argument('--train_whole_vol', choices=('True','False'), default='False')
         self.parser.add_argument('--only_foreground',choices=('True','False'), default='False')
         self.parser.add_argument('--foreground_probability', type=float, default=0.75)
         self.parser.add_argument('--extra_cropping',choices=('True','False'), default='False')
