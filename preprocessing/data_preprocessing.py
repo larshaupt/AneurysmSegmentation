@@ -80,7 +80,7 @@ def extract_preprocessed_files(path_to_data, path_to_masks):
     masks, x_files, y_files = sorted(masks), sorted(x_files), sorted(y_files)
     
     for x,y,m in zip(x_files, y_files, masks):
-        MRI_file_list.append({'x': x, 'y':y, 'mask':m, 'name': os.path.basename(x)[:-8]})
+        MRI_file_list.append({'x': x, 'y':y, 'mask':m, 'name': os.path.basename(x)[:-9]})
 
     return MRI_file_list
 
@@ -180,8 +180,7 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
         nii_y_img = nib.Nifti1Image(nii_y_img.dataobj, x_affine, nii_x_img.header)
 
         if resample:
-            new_y_dim = compute_new_dim(nii_y_img.header["dim"][1:4], nii_y_img.header["pixdim"][1:4], voxel_size)
-            nii_y_img = conform(nii_y_img, voxel_size = voxel_size, out_shape = new_y_dim, order = 0, cval=0)
+            nii_y_img = conform(nii_y_img, voxel_size = voxel_size, out_shape = new_x_dim, order = 0, cval=0)
         #nii_y_img = resample_to_output(nii_y_img, voxel_sizes=voxel_size, order = 0, mode = 'constant', cval=0)
         #nii_y_img = conform(nii_y_img, out_shape=out_shape, voxel_size=voxel_size, order=0, cval=0, orientation='RAS')
 
@@ -201,7 +200,8 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
 
             nii_y_data_corr = correct_labels(nii_y_img.get_fdata().astype('uint8'), label_mapping_dict)
             nii_y_img = nib.Nifti1Image(nii_y_data_corr, nii_y_img.affine, nii_y_img.header)
-
+        if nii_y_img.get_fdata().shape != nii_x_img.get_fdata().shape:
+            print(f"Warning: label and target don't have the same shape: {nii_y_img.get_fdata().shape} and {nii_x_img.get_fdata().shape}")
         if save_as == "npy":
             with open(path_to_saved_y_file + ".npy", 'wb') as f:
                 np.save(f, nii_y_img.get_fdata())
@@ -234,34 +234,35 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
             nib.save(nii_mask_img,path_to_saved_mask + ".nii.gz" )
 
 
-MRI_file_list = extract_files(path_to_data)
-#MRI_file_list = extract_preprocessed_files(path_to_preprocessed_nifti, path_to_masks)
+#MRI_file_list = extract_files(path_to_data)
+MRI_file_list = extract_preprocessed_files(path_to_preprocessed_nifti, path_to_masks)
 
-save_path = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_nifti/data"
+save_path = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias/data"
 
-targets = ["11096773_IB_PComm", "10919238_GD_MCA"]
+#targets = ["11096773_IB_PComm", "10919238_GD_MCA"]
+targets = []
 label_mapping_file = "label_assignment.csv"
 def run_process(every_n = 4, start_i = 0):
     for i in range(start_i, len(MRI_file_list), every_n):
-        if targets != None:
+        if len(targets) != 0:
             if not any([target in MRI_file_list[i]["name"] for target in targets]):
                 continue
         process_file(MRI_file_list[i], 
         i, 
         save_path, 
-        resample = False, 
-        voxel_size = (1.0, 1.0, 1.0) ,
-        bias_corr = True, 
-        preprocessed=False,
+        resample = True, 
+        voxel_size = (0.6, 0.6, 0.3) ,
+        bias_corr = False, 
+        preprocessed=True,
         save_header = False, 
-        save_as="nifti", 
+        save_as="h5", 
         overwrite=True, 
-        label_mapping=label_mapping_file,
+        label_mapping="",
         include_mask=False,
         )
 
 ps = []
-n = 2
+n = 8
 split_dif = n
 split_id = 0
 for k in range(split_id*split_dif, split_dif*(split_id+1)):
