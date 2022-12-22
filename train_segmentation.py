@@ -15,14 +15,15 @@ from train.options import Options
 def main(exp_config, exp_cont = ""):
     train_logs = []
     
-    if exp_config.k_fold:
+    if exp_config.k_fold: # doing k-fold cv
         for fold_id in range(exp_config.k_fold_k):
             exp_config.fold_id = fold_id
             log = train(exp_config, fold_id = fold_id,  exp_cont = exp_cont)
             train_logs.append(log)
 
-    else:   
+    else:   # not doing k-fold cv
         log = train(exp_config, fold_id = exp_config.fold_id,  exp_cont = exp_cont)
+        
     scores = [el.get_best_score("val_Dice", max=True, return_epoch=False) for el in train_logs]
     best_epochs = [el.get_best_score("val_Dice", max=True, return_epoch=True)[1] for el in train_logs]
     print("Dice: ", scores, " Best Epochs: ", best_epochs)

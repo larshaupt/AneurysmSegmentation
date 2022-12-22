@@ -8,6 +8,7 @@ from nilearn.plotting import plot_anat, plot_roi
 from nilearn.masking import compute_brain_mask
 from scipy.ndimage import binary_fill_holes, binary_closing
 import matplotlib.pyplot as plt
+import scipy
 
 
 #%%
@@ -33,6 +34,21 @@ def extract_brain(img, add_border = 40):
     closed_data_de = binary_closing(extended_mask_data, iterations=add_border)[add_border:-add_border, add_border:-add_border, add_border:-add_border]
     return nib.Nifti2Image(closed_data_de,mask.affine, mask.header)
 
+def extended_closing(data, iterations):
+    (x_s, y_s, z_s) = data.shape
+    data_new = np.zeros((x_s + 2*iterations, y_s + 2*iterations, z_s + 2*iterations))
+    data_new[iterations:-iterations,iterations:-iterations,iterations:-iterations] = data
+    data_new = scipy.ndimage.binary_closing(data_new, iterations=iterations)
+    data = data_new[iterations:-iterations,iterations:-iterations,iterations:-iterations]
+    return data
+
+def threshold_masking(data):
+
+
+    mask = scipy.ndimage.binary_opening(data > np.percentile(data, 99)/10, iterations=2)
+    mask = extended_closing(mask, iterations=30)
+    return mask
+
 
 #%%
 
@@ -56,10 +72,12 @@ for x, y in zip(x_files,y_files):
 
     label = nib.load(y)
     image = nib.load(x)
-    mask = nib.load(os.path.join(out_dir, os.path.basename(x) + "_mask.nii.gz"))
+    #mask = nib.load(os.path.join(out_dir, os.path.basename(x) + "_mask.nii.gz"))
     #mask = extract_brain(image)
     #nib.save(mask, os.path.join(save_path, os.path.basename(y).replace('_y', '_mask')))
-    label_data, mask_data = label.get_fdata(), mask.get_fdata()
+    #label_data, mask_data = label.get_fdata(), mask.get_fdata()
+    label_data = label.get_fdata()
+    mask_data = threshold_masking(image.get_fdata())
     lost_points = np.argwhere(np.logical_and(mask_data < 0.5, label_data!=0))
     lost_points_target = np.argwhere(np.logical_and(mask_data > 0.5, label_data==4))
     lost_points_all.append(lost_points)
