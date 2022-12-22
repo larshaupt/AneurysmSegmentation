@@ -288,7 +288,6 @@ class Options:
         ], debug=False)
 
         #################### LOSS FUNCTION ####################
-
         if self.opt.loss.lower() == 'weightedbce':
             if self.opt.num_classes == 1:
                 self.opt.criterion_loss  = torch.nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([self.opt.positive_weight]).to(self.opt.device))
@@ -300,7 +299,7 @@ class Options:
                 self.opt.criterion_loss = nn.CrossEntropyLoss(weight=torch.Tensor(weight_list).to(self.opt.device))
             else:
                 raise NotImplementedError(f'Num_Classes {self.opt.num_classes} for {self.opt.loss} is not implemented')
-
+        
         elif  self.opt.loss.lower() == 'mixloss':
             self.opt.criterion_loss = MixLoss([nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([self.opt.positive_weight]).to(self.opt.device)), DiceLoss()], [0.9,0.1])
         elif self.opt.loss.lower() == 'focalloss':
@@ -313,9 +312,9 @@ class Options:
             self.opt.criterion_loss = MixSweepLoss([nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([self.opt.positive_weight]).to(self.opt.device)), FocalDiceLoss()], [1.0,0.0])
         elif self.opt.loss.lower() == 'softdiceloss':
             if self.opt.num_classes == 1:
-                self.opt.criterion_loss = monai.losses.GeneralizedDiceLoss(include_background=True, to_onehot_y=True, sigmoid=True, reduction='mean')
+                self.opt.criterion_loss = monai.losses.GeneralizedDiceLoss(include_background=True, to_onehot_y=False, sigmoid=True, reduction='mean')
             else:
-                self.opt.criterion_loss = monai.losses.GeneralizedDiceLoss(include_background=False, to_onehot_y=True, sigmoid=True, reduction='mean')
+                self.opt.criterion_loss = monai.losses.GeneralizedDiceLoss(include_background=False, to_onehot_y=False, sigmoid=True, reduction='mean')
         else: 
             raise NotImplementedError(f'Loss {self.opt.loss} is not implemented')
 
