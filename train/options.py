@@ -206,7 +206,8 @@ class Options:
         self.opt.experiment_name = '%s_sweep_%d'%(self.opt.dataset, timestamp)
         self.opt.experiment_group_name = self.opt.experiment_name
         self.opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+        if self.opt.dataset.lower() == 'adam': # QUick fix for parameters, all case of ADAM point to the correct ADAM dataset
+            self.opt.dataset = 'ADAM'
         if self.opt.path_data == "":
             self.opt.path_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/%s/data/'%(self.opt.dataset)
         if self.opt.path_split == "":
