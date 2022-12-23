@@ -116,27 +116,28 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
     path_to_saved_mask = os.path.join(path, mri_file['name'] + '_mask')
 
 
-    if not os.path.exists(path_to_saved_x_file) or overwrite:
-        # Process Angiography TOF file (X)
-        if not preprocessed:
-            tof = []
-            for nii_file in mri_file['nii'] :
-                if 'tof' in nii_file.lower():
-                    tof.append(nii_file)
-            if len(tof) != 1:
-                print('Error: Could not find the correct nii TOF file')
-                print('Files found: ', tof)
-            nii_x = tof[0]
+    if not preprocessed:
+        tof = []
+        for nii_file in mri_file['nii'] :
+            if 'tof' in nii_file.lower():
+                tof.append(nii_file)
+        if len(tof) != 1:
+            print('Error: Could not find the correct nii TOF file')
+            print('Files found: ', tof)
+        nii_x = tof[0]
 
-        else:
-            nii_x = mri_file['x'] 
+    else:
+        nii_x = mri_file['x'] 
 
-        nii_x_img = nib.load(nii_x)
+    nii_x_img = nib.load(nii_x)
 
-        x_affine = nii_x_img.affine.copy()
-        x_header = nii_x_img.header.copy()
-
-        if not skip_tof:
+    x_affine = nii_x_img.affine.copy()
+    x_header = nii_x_img.header.copy()
+    new_x_dim = compute_new_dim(nii_x_img.header["dim"][1:4], nii_x_img.header["pixdim"][1:4], voxel_size)
+    if not skip_tof:
+        if not os.path.exists(path_to_saved_x_file) or overwrite:
+            # Process Angiography TOF file (X)
+        
             if bias_corr:
                 nii_x_img = do_bias_correction(nii_x_img)
 
@@ -144,7 +145,7 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
             # preprocessing data
             #nii_x_img = resample_to_output(nii_x_img, voxel_sizes=voxel_size, order = 3, mode = 'constant', cval=0)
             if resample:
-                new_x_dim = compute_new_dim(nii_x_img.header["dim"][1:4], nii_x_img.header["pixdim"][1:4], voxel_size)
+                
                 nii_x_img = conform(nii_x_img, voxel_size = voxel_size, out_shape = new_x_dim, order = 3, cval=0)
 
             if save_header:
@@ -224,8 +225,8 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
         nii_mask_img = nib.Nifti1Image(nii_mask_img.dataobj, x_affine, x_header)
 
         if resample:
-            new_mask_dim = compute_new_dim(nii_mask_img.header["dim"][1:4], nii_mask_img.header["pixdim"][1:4], voxel_size)
-            nii_mask_img = conform(nii_mask_img, voxel_size = voxel_size, out_shape = new_mask_dim, order = 0, cval=0)
+            #new_mask_dim = compute_new_dim(nii_mask_img.header["dim"][1:4], nii_mask_img.header["pixdim"][1:4], voxel_size)
+            nii_mask_img = conform(nii_mask_img, voxel_size = voxel_size, out_shape = new_x_dim, order = 0, cval=0)
 
 
         if save_as == "npy":
@@ -266,7 +267,7 @@ def run_process(every_n = 4, start_i = 0):
         skip_label=True,
         skip_tof=True
         )
-
+run_process(1,0)
 ps = []
 n = 4
 split_dif = n
