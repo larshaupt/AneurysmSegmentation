@@ -337,7 +337,7 @@ class Options:
                 "MDice": MultiClassDiceMetric(include_background=True) if self.opt.compute_mdice else None
                     }
 
-        if not hasattr(self.opt, 'criterion_metric_train'):
+        if not hasattr(self.opt, 'metric_train'):
             self.opt.criterion_metric_train = self.opt.criterion_metric      
         elif self.opt.metric_train.lower() == "full":
             self.opt.criterion_metric_train = self.opt.criterion_metric   
