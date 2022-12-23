@@ -15,7 +15,7 @@ path_to_data = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArte
 path_to_external_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_processed/data'
 path_to_exterinal_header = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_processed/header'
 path_to_preprocessed_nifti = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_nifti/data'
-path_to_masks = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_fs_nifti/data'
+path_to_masks = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_be_nifti/data'
 import sys
 sys.path.append(os.path.join(path_to_repo, "src/utils/"))
 
@@ -107,7 +107,7 @@ def do_bias_correction(img):
     return nib.Nifti1Image(img_data_corr, img.affine, img.header)
 
 
-def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6) ,preprocessed = False,bias_corr = False, include_mask=False ,save_header = True, save_as="h5", overwrite=False, label_mapping='label_assignment.csv', skip_tof=False):
+def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6) ,preprocessed = False,bias_corr = False, include_mask=False ,save_header = True, save_as="h5", overwrite=False, label_mapping='label_assignment.csv', skip_tof=False, skip_label = False):
     
     print(f"Processing {i} out of {len(MRI_file_list)}: {mri_file['name']}")
 
@@ -115,25 +115,28 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
     path_to_saved_x_file = os.path.join(path, mri_file['name'] + '_x')
     path_to_saved_mask = os.path.join(path, mri_file['name'] + '_mask')
 
-    if not skip_tof:
-        if not os.path.exists(path_to_saved_x_file) or overwrite:
-            # Process Angiography TOF file (X)
-            if not preprocessed:
-                tof = []
-                for nii_file in mri_file['nii'] :
-                    if 'tof' in nii_file.lower():
-                        tof.append(nii_file)
-                if len(tof) != 1:
-                    print('Error: Could not find the correct nii TOF file')
-                    print('Files found: ', tof)
-                nii_x = tof[0]
 
-            else:
-                nii_x = mri_file['x'] 
+    if not os.path.exists(path_to_saved_x_file) or overwrite:
+        # Process Angiography TOF file (X)
+        if not preprocessed:
+            tof = []
+            for nii_file in mri_file['nii'] :
+                if 'tof' in nii_file.lower():
+                    tof.append(nii_file)
+            if len(tof) != 1:
+                print('Error: Could not find the correct nii TOF file')
+                print('Files found: ', tof)
+            nii_x = tof[0]
 
-            nii_x_img = nib.load(nii_x)
+        else:
+            nii_x = mri_file['x'] 
 
-            x_affine = nii_x_img.affine.copy()
+        nii_x_img = nib.load(nii_x)
+
+        x_affine = nii_x_img.affine.copy()
+        x_header = nii_x_img.header.copy()
+
+        if not skip_tof:
             if bias_corr:
                 nii_x_img = do_bias_correction(nii_x_img)
 
@@ -158,58 +161,59 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
             elif save_as == "nifti":
                 nib.save(nii_x_img, path_to_saved_x_file + ".nii.gz")
 
-    if not os.path.exists(path_to_saved_y_file) or overwrite:
-        # Process Segmentation label file (Y)
-        if not preprocessed:
-            seg = []
-            for nii_file in mri_file['nii']:
-                if nii_file not in tof:
-                    seg.append(nii_file)
-            if len(seg) != 1:
-                print('Warning: Found multiple segmentation files')
-                print('Files found: ', seg)
-                cands = [el for el in seg if "segmentation" in el.lower()]
-                if cands != None:
-                    seg = cands
-            nii_y = seg[0]
-        else:
-            nii_y = mri_file['y']
-            
-        nii_y_img = nib.load(nii_y)
-        # Copy affine from X
-        nii_y_img = nib.Nifti1Image(nii_y_img.dataobj, x_affine, nii_x_img.header)
-
-        if resample:
-            nii_y_img = conform(nii_y_img, voxel_size = voxel_size, out_shape = new_x_dim, order = 0, cval=0)
-        #nii_y_img = resample_to_output(nii_y_img, voxel_sizes=voxel_size, order = 0, mode = 'constant', cval=0)
-        #nii_y_img = conform(nii_y_img, out_shape=out_shape, voxel_size=voxel_size, order=0, cval=0, orientation='RAS')
-
-        if any(nii_y_img.header['dim'] != nii_x_img.header['dim']):
-            print('Warning: image and segmentation do not have the same dimensions. ', nii_y_img.header['dim'], nii_x_img.header['dim'])
-
-        if any(nii_y_img.header['pixdim'] != nii_x_img.header['pixdim']):
-            print('Warning: image and segmentation do not have the same voxel size. ', nii_y_img.header['pixdim'], nii_x_img.header['pixdim'])
-
-        if label_mapping != None and label_mapping != "":
-            if isinstance(label_mapping, dict):
-                label_mapping_dict ==label_mapping
-            elif isinstance(label_mapping, str):
-                label_mapping_dict = pd.read_csv(os.path.join(mri_file['path'], label_mapping), dtype={'class_id': int, 'id_in_file': float, 'class_name': str, 'name_in_table': str})
+    if not skip_label:
+        if not os.path.exists(path_to_saved_y_file) or overwrite:
+            # Process Segmentation label file (Y)
+            if not preprocessed:
+                seg = []
+                for nii_file in mri_file['nii']:
+                    if nii_file not in tof:
+                        seg.append(nii_file)
+                if len(seg) != 1:
+                    print('Warning: Found multiple segmentation files')
+                    print('Files found: ', seg)
+                    cands = [el for el in seg if "segmentation" in el.lower()]
+                    if cands != None:
+                        seg = cands
+                nii_y = seg[0]
             else:
-                raise Exception(f"{label_mapping} does not have the right format")
+                nii_y = mri_file['y']
+                
+            nii_y_img = nib.load(nii_y)
+            # Copy affine from X
+            nii_y_img = nib.Nifti1Image(nii_y_img.dataobj, x_affine, x_header)
 
-            nii_y_data_corr = correct_labels(nii_y_img.get_fdata().astype('uint8'), label_mapping_dict)
-            nii_y_img = nib.Nifti1Image(nii_y_data_corr, nii_y_img.affine, nii_y_img.header)
-        if nii_y_img.get_fdata().shape != nii_x_img.get_fdata().shape:
-            print(f"Warning: label and target don't have the same shape: {nii_y_img.get_fdata().shape} and {nii_x_img.get_fdata().shape}")
-        if save_as == "npy":
-            with open(path_to_saved_y_file + ".npy", 'wb') as f:
-                np.save(f, nii_y_img.get_fdata())
-        elif save_as == "h5":
-            with h5py.File(path_to_saved_y_file + ".h5", 'w') as f:
-                f.create_dataset('data', data=nii_y_img.get_fdata()) 
-        elif save_as == "nifti":
-            nib.save(nii_y_img,path_to_saved_y_file + ".nii.gz" )
+            if resample:
+                nii_y_img = conform(nii_y_img, voxel_size = voxel_size, out_shape = new_x_dim, order = 0, cval=0)
+            #nii_y_img = resample_to_output(nii_y_img, voxel_sizes=voxel_size, order = 0, mode = 'constant', cval=0)
+            #nii_y_img = conform(nii_y_img, out_shape=out_shape, voxel_size=voxel_size, order=0, cval=0, orientation='RAS')
+
+            if any(nii_y_img.header['dim'] != nii_x_img.header['dim']):
+                print('Warning: image and segmentation do not have the same dimensions. ', nii_y_img.header['dim'], nii_x_img.header['dim'])
+
+            if any(nii_y_img.header['pixdim'] != nii_x_img.header['pixdim']):
+                print('Warning: image and segmentation do not have the same voxel size. ', nii_y_img.header['pixdim'], nii_x_img.header['pixdim'])
+
+            if label_mapping != None and label_mapping != "":
+                if isinstance(label_mapping, dict):
+                    label_mapping_dict ==label_mapping
+                elif isinstance(label_mapping, str):
+                    label_mapping_dict = pd.read_csv(os.path.join(mri_file['path'], label_mapping), dtype={'class_id': int, 'id_in_file': float, 'class_name': str, 'name_in_table': str})
+                else:
+                    raise Exception(f"{label_mapping} does not have the right format")
+
+                nii_y_data_corr = correct_labels(nii_y_img.get_fdata().astype('uint8'), label_mapping_dict)
+                nii_y_img = nib.Nifti1Image(nii_y_data_corr, nii_y_img.affine, nii_y_img.header)
+            if nii_y_img.get_fdata().shape != nii_x_img.get_fdata().shape:
+                print(f"Warning: label and target don't have the same shape: {nii_y_img.get_fdata().shape} and {nii_x_img.get_fdata().shape}")
+            if save_as == "npy":
+                with open(path_to_saved_y_file + ".npy", 'wb') as f:
+                    np.save(f, nii_y_img.get_fdata())
+            elif save_as == "h5":
+                with h5py.File(path_to_saved_y_file + ".h5", 'w') as f:
+                    f.create_dataset('data', data=nii_y_img.get_fdata()) 
+            elif save_as == "nifti":
+                nib.save(nii_y_img,path_to_saved_y_file + ".nii.gz" )
 
     if include_mask and (not os.path.exists(path_to_saved_mask) or overwrite):
         if preprocessed:
@@ -217,7 +221,7 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
 
         nii_mask_img = nib.load(nii_mask)
         # Copy affine from X
-        nii_mask_img = nib.Nifti1Image(nii_mask_img.dataobj, x_affine, nii_x_img.header)
+        nii_mask_img = nib.Nifti1Image(nii_mask_img.dataobj, x_affine, x_header)
 
         if resample:
             new_mask_dim = compute_new_dim(nii_mask_img.header["dim"][1:4], nii_mask_img.header["pixdim"][1:4], voxel_size)
@@ -251,18 +255,20 @@ def run_process(every_n = 4, start_i = 0):
         i, 
         save_path, 
         resample = True, 
-        voxel_size = (0.6, 0.6, 0.3) ,
+        voxel_size = (0.3, 0.3, 0.6) ,
         bias_corr = False, 
         preprocessed=True,
         save_header = False, 
         save_as="h5", 
         overwrite=True, 
         label_mapping="",
-        include_mask=False,
+        include_mask=True,
+        skip_label=True,
+        skip_tof=True
         )
 
 ps = []
-n = 8
+n = 4
 split_dif = n
 split_id = 0
 for k in range(split_id*split_dif, split_dif*(split_id+1)):

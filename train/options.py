@@ -378,7 +378,7 @@ class Options:
                 spatial_dims = 3, 
                 in_channels = 1, 
                 out_channels = self.opt.num_classes, 
-                channels = (16, 32, 64, 128), 
+                channels = channels, 
                 strides = (2, 2, 2, 2), 
                 kernel_size=3, 
                 up_kernel_size=3, 
