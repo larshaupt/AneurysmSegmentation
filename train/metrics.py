@@ -9,6 +9,9 @@ from torchmetrics import Dice, Precision, Recall, AUROC
 import numpy as np
 import monai
 import pdb
+import time
+import SimpleITK as sitk
+import scipy
 
 #%%
 def convert_to_tensor(data):
@@ -143,7 +146,7 @@ class TargetLabelMetric():
 
 
 class MetricesStruct():
-    def __init__(self, metrices, prefix:str = "") -> None:
+    def __init__(self, metrices, prefix:str = "", debug = False) -> None:
 
         if isinstance(metrices, dict):
             self.metrices = metrices
@@ -158,13 +161,18 @@ class MetricesStruct():
         self.count = 0
         self.average_scores = {}
         self.prefix = prefix
+        self.debug = debug
 
     def update(self, pred, target, el_name=""):
 
         for el_id in range(pred.shape[0]): 
             for name, func in self.metrices.items():
                 if func != None:
+                    if self.debug:
+                        start_time = time.time()
                     score = func(pred[el_id,...],target[el_id,...])
+                    if self.debug:
+                        print(f'Metric computing time for {name}: {round(time.time()-start_time, 4)} seconds')
                     if isinstance(score, Tensor):
                         score = score.to("cpu").item()
                     self.scores[name].append((score,el_name))
@@ -217,19 +225,98 @@ class MetricesStruct():
         return self.metrices[self.metrices.keys()[0]](pred, target)
 
 
-class HausDorffMetric():
+class HausDorffMetricMonai():
     def __init__(self, include_background=False, distance_metric='euclidean', percentile=None) -> None:
         self.include_background = include_background
         self.distance_metric = distance_metric
         self.percentile = percentile
 
     def __call__(self, pred: Tensor, target: Tensor) -> float:
+        pred = pred.unsqueeze(0)
+        target = target.unsqueeze(0)
         return monai.metrics.compute_hausdorff_distance(pred, target, 
             include_background=self.include_background, 
             distance_metric=self.distance_metric, 
             percentile=self.percentile)
 
 
+class HausDorffMetric():
+    def __init__(self, percentile=95) -> None:
+        self.percentile = percentile
+    def __call__(self, pred: Tensor, target: Tensor):
+        #result_statistics = sitk.StatisticsImageFilter()
+        #result_statistics.Execute(result_image)
+        pred = pred.detach().numpy()
+        target = target.detach().numpy()
+        pred_sum = np.sum(pred)
+        if pred_sum == 0:
+            hd = torch.nan
+            return hd
+
+        # Edge detection is done by ORIGINAL - ERODED, keeping the outer boundaries of lesions. Erosion is performed in 3D
+        #e_test_image = sitk.BinaryErode(test_image, (1, 1, 1))
+        #e_result_image = sitk.BinaryErode(result_image, (1, 1, 1))
+        e_target = scipy.ndimage.binary_erosion(target)
+        e_pred = scipy.ndimage.binary_erosion(pred)
+
+        #h_test_image = sitk.Subtract(test_image, e_test_image)
+        #h_result_image = sitk.Subtract(result_image, e_result_image)
+        h_target = target- e_target
+        h_pred = pred- e_pred
+
+
+        h_target_indices = np.argwhere(h_target)
+        h_pred_indices = np.argwhere(h_pred)
+
+        #h_test_indices = np.flip(np.argwhere(sitk.GetArrayFromImage(h_test_image))).tolist()
+        #h_result_indices = np.flip(np.argwhere(sitk.GetArrayFromImage(h_result_image))).tolist()
+
+        target_coordinates = h_target_indices
+        pred_coordinates = h_pred_indices
+        #test_coordinates = [test_image.TransformIndexToPhysicalPoint(x) for x in h_test_indices]
+        #result_coordinates = [test_image.TransformIndexToPhysicalPoint(x) for x in h_result_indices]
+        
+        def get_distances_from_a_to_b(a, b):
+            kd_tree = scipy.spatial.KDTree(a, leafsize=100)
+            return kd_tree.query(b, k=1, eps=0, p=2)[0]
+
+        d_test_to_result = get_distances_from_a_to_b(target_coordinates, pred_coordinates)
+        d_result_to_test = get_distances_from_a_to_b(pred_coordinates, target_coordinates)
+
+        hd = max(np.percentile(d_test_to_result, self.percentile), np.percentile(d_result_to_test, self.percentile))
+        
+        return hd
+
+class VolumetricSimilarityMetric():
+    def __init__(self) -> None:
+        pass
+    def __call__(self, pred: Tensor, target: Tensor) -> None:
+
+        """
+        Volumetric Similarity.
+        
+        VS = 1 -abs(A-B)/(A+B)
+        
+        A = ground truth
+        B = predicted     
+        """
+        
+        #test_statistics = sitk.StatisticsImageFilter()
+        #result_statistics = sitk.StatisticsImageFilter()
+        
+        #test_statistics.Execute(target)
+        #result_statistics.Execute(pred)
+        
+        #numerator = abs(test_statistics.GetSum() - result_statistics.GetSum())
+        #denominator = test_statistics.GetSum() + result_statistics.GetSum()
+        numerator = abs(torch.sum(target) - torch.sum(pred))
+        denominator = torch.sum(target) - torch.sum(pred)
+        if denominator > 0:
+            vs = 1 - (numerator / denominator)
+        else:
+            vs = torch.nan
+             
+        return vs
 
 
 #%%

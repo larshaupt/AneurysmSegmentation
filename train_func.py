@@ -177,6 +177,7 @@ def train_segmentation_network(
                             save_every_n_epoch=10)
 
     print(exp_cont)
+    print(f'Training on {device}')
 
     if exp_config.lr_scheduler == 'reduce':
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=int(exp_config.patience/2), threshold=1e-5, verbose=True)

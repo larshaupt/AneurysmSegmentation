@@ -141,7 +141,7 @@ class Options:
         self.parser.add_argument('--test_dataset', default='test', help='dataset name')
         self.parser.add_argument('--grid_validation', choices=('True','False'), default='False', help='Use grid patching for validation?')
         self.parser.add_argument('--compute_mdice', choices=('True','False'), default='False', help='Compute Multiclass Dice? Needs more memory')
-        self.parser.add_argument('--metric_training', type=str, default="full", help='Options are full, reduced, none')
+        self.parser.add_argument('--metric_train', type=str, default="reduced", help='Options are full, reduced, none')
 
 
         self.parser.add_argument('--shuffle_train',choices=('True','False'), default='True', help='shuffle_train')
@@ -191,6 +191,7 @@ class Options:
         self.parser.add_argument('--rand_affine',choices=('True','False'), default='True')
 
         self.parser.add_argument('--model_name', type=str, default='UNet', help='name of model')
+        self.parser.add_argument('--num_blocks', type=int, default=5)
         self.parser.add_argument('--dropout', type=float, default=0.0, help='dropout rate')
 
 
@@ -325,6 +326,8 @@ class Options:
                     "Dice":DiceMetric(),
                     "Recall": RecallMetric(),
                     "Precision": PrecisionMetric(),
+                    "Hausdorff": HausDorffMetricMonai(percentile=99),
+                    "VolSimilarity": VolumetricSimilarityMetric()
                     }
         else:
             self.opt.criterion_metric =  {                    
@@ -336,9 +339,9 @@ class Options:
 
         if not hasattr(self.opt, 'criterion_metric_train'):
             self.opt.criterion_metric_train = self.opt.criterion_metric      
-        elif self.opt.criterion_metric_train.lower() == "full":
+        elif self.opt.metric_train.lower() == "full":
             self.opt.criterion_metric_train = self.opt.criterion_metric   
-        elif self.opt.criterion_metric_train.lower() == "reduced":
+        elif self.opt.metric_train.lower() == "reduced":
             reduced_metrices = ["Dice", "Recall", "Precision"]
             self.opt.criterion_metric_train = {key:self.opt.criterion_metric[key] for key in self.opt.criterion_metric.keys() if key in reduced_metrices}
         else: #self.opt.criterion_metric_train.lower() == "none" or self.opt.criterion_metric_train.lower() == None
@@ -349,13 +352,17 @@ class Options:
 
 
         #################### MODEL ####################
+        if hasattr(self.opt, 'num_blocks'):
+            channels = [int(2**(4+n)) for n in range(self.opt.num_blocks)]
+        else:
+            channels = (16, 32, 64, 128, 256)
 
         if self.opt.model_name.lower() == 'unet':
             self.opt.model = UNet(
                 spatial_dims=3,
                 in_channels=1,
                 out_channels=self.opt.num_classes,
-                channels=(16, 32, 64, 128, 256),
+                channels=channels,
                 strides=(2, 2, 2, 2),
                 kernel_size=3, 
                 up_kernel_size=3, 
