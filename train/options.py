@@ -201,7 +201,8 @@ class Options:
     def interpret_params(self):
 
         for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine"]:
-            vars(self.opt)[el] = eval(vars(self.opt)[el])
+            if isinstance(vars(self.opt)[el], str):
+                vars(self.opt)[el] = eval(vars(self.opt)[el])
         #################### GENERAL PARAMETERS ####################
         timestamp = int(time.time())
         self.opt.experiment_name = '%s_sweep_%d'%(self.opt.dataset, timestamp)

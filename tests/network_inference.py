@@ -1,6 +1,6 @@
 # %%
 import sys
-sys.path.append('/scratch_net/biwidl311/lhauptmann/segmentation_3D')
+sys.path.append('../')
 
 import train.utils as ut
 from data import transformations, data_loader, HDF5Dataset3D
@@ -67,7 +67,7 @@ def make_predictions(
     metric = MetricesStruct(exp_config.criterion_metric, prefix='')
 
 
-    for i, (data, target, norm_params, name) in enumerate(data_loader):
+    for i, (data, target, mask ,norm_params, name) in enumerate(data_loader):
 
         print(f"Predicting {name}")
         if i >= num and num!=-1:
@@ -182,12 +182,12 @@ def save_pred(
 
 
 #%%
-experiment_name = 'USZ_hdf5d2_sweep_1671188989'
-#epoch = 130
-#model_name = 'model_%i.pth'%(epoch)
+experiment_name = 'USZ_hdf5d2_sweep_1671843466'
+epoch = 290
+model_name = 'model_%i.pth'%(epoch)
 model_name = 'best_model.pth'
-config_file = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/USZ_hdf5d2_sweep_1671188989.json' %(experiment_name)       
-model_weight_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/0/' %(experiment_name) + model_name
+config_file = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/USZ_hdf5d2_sweep_1671843466.json' %(experiment_name)       
+model_weight_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/4/' %(experiment_name) + model_name
 save_path = '/srv/beegfs02/scratch/brain_artery/data/training/predictions/%s/' %(experiment_name)
 make_predictions(model_weight_path, 
             config_file, 
@@ -195,10 +195,10 @@ make_predictions(model_weight_path,
             img=True,  
             gifs = False, 
             nifti=True, 
-            split = 'val', 
+            split = 'test', 
             num_slices = 5, 
             num=10 ,
-            tf_mode='val', 
+            tf_mode='test', 
             scale_factor = (2.0/3.0, 2.0/3.0, 1.0),
             save = True,
             binarize_target = True)
