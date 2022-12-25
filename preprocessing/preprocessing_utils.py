@@ -172,9 +172,9 @@ def match_labels(color_table, class_table):
     matches_ratio = []
     
     while len(js) != 0 and i < color_table.shape[0]:
-        matches = [SequenceMatcher(None, class_table['name'][j], color_table['Background'][i]).ratio() for j in js]
+        matches = [SequenceMatcher(None, class_table['name'].iloc[j], color_table['name'].iloc[i]).ratio() for j in js]
         j = js[matches.index(max(matches))]
-        mapping[j] = [j,i ,class_table['name'][j], color_table['Background'][i]]
+        mapping[j] = [class_table['label id'].iloc[j],color_table['label id'].iloc[i] ,class_table['name'].iloc[j], color_table['name'].iloc[i]]
         i = i+1
         js.remove(j)
         matches_ratio.append(max(matches))
@@ -192,7 +192,7 @@ def match_labels(color_table, class_table):
 def correct_labels(data, mapping):
     dtype = data.dtype
     label_mapping = mapping[['id_in_file', 'class_id']].dropna(axis='index', how='any').astype(int).set_index('id_in_file').to_dict()['class_id']
-    
+    # bugfix
     return map_labels(data, label_mapping).astype(int)
 
 def map_labels(data, label_mapping:dict):
