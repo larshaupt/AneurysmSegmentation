@@ -14,3 +14,4 @@ runs/*
 old_files/sbatch_logs/*
 data/__pycache__/*
 USZ_BrainArtery.code-workspace
+jobs/brainseg_sweep-job.sh

@@ -5,6 +5,7 @@ import nibabel as nib # mri nii file reading
 import pandas as pd # for general table handling
 import h5py
 import multiprocessing
+import pickle
 
 # %%
 
@@ -86,8 +87,6 @@ def extract_preprocessed_files(path_to_data, path_to_masks):
 
 MRI_file_list = extract_files(path_to_data)
 
-        
-
 
 # %%
 # Read through all MRI files, correct the labels and save them as extra files
@@ -148,10 +147,7 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
                 
                 nii_x_img = conform(nii_x_img, voxel_size = voxel_size, out_shape = new_x_dim, order = 3, cval=0)
 
-            if save_header:
-                json_object = pd.Series(nii_x_img.header).to_json()
-                with open(os.path.join(path_to_exterinal_header, mri_file['name'] + '.json'), 'w') as f:
-                    f.write(json_object)
+
 
             if save_as == "npy":
                 with open(path_to_saved_x_file + ".npy", 'wb') as f:
@@ -161,7 +157,9 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
                     f.create_dataset('data', data=nii_x_img.get_fdata()) 
             elif save_as == "nifti":
                 nib.save(nii_x_img, path_to_saved_x_file + ".nii.gz")
-
+    if save_header:
+        with open(os.path.join(path, mri_file['name'] + '_header.pickle'), 'wb') as f:
+            pickle.dump(nii_x_img.header, f, protocol=pickle.HIGHEST_PROTOCOL)
     if not skip_label:
         if not os.path.exists(path_to_saved_y_file) or overwrite:
             # Process Segmentation label file (Y)
@@ -242,7 +240,7 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
 #MRI_file_list = extract_files(path_to_data)
 MRI_file_list = extract_preprocessed_files(path_to_preprocessed_nifti, path_to_masks)
 
-save_path = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias/data"
+save_path = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias111/data"
 
 #targets = ["11096773_IB_PComm", "10919238_GD_MCA"]
 targets = []
@@ -256,20 +254,20 @@ def run_process(every_n = 4, start_i = 0):
         i, 
         save_path, 
         resample = True, 
-        voxel_size = (0.3, 0.3, 0.6) ,
+        voxel_size = (1.0, 1.0, 1.0) ,
         bias_corr = False, 
         preprocessed=True,
-        save_header = False, 
+        save_header = True, 
         save_as="h5", 
         overwrite=True, 
-        label_mapping="",
-        include_mask=True,
-        skip_label=True,
-        skip_tof=True
+        label_mapping='',
+        include_mask=False,
+        skip_label=False,
+        skip_tof=False,
         )
-run_process(1,0)
+
 ps = []
-n = 4
+n = 6
 split_dif = n
 split_id = 0
 for k in range(split_id*split_dif, split_dif*(split_id+1)):

@@ -41,8 +41,12 @@ def animate_img(img_data, size='small', path_to_data_analysis = "../data_analysi
     print('Gif saved under: ', save_path)
 
 def save_to_nifti(data, path, voxel_size):
-    nifti = nib.Nifti1Image((data).astype(np.int16), np.eye(4))
-    nifti.header['pixdim'] = [1.,voxel_size[0],voxel_size[1],voxel_size[2],0.,0.,0.,0.]
+    nifti = nib.Nifti1Image((data).astype(np.int16), np.diag([*voxel_size, 0]))
+
+    #nifti.header['pixdim'] = [1.,voxel_size[0],voxel_size[1],voxel_size[2],0.,0.,0.,0.]
+    #nifti.header['srow_x'] =  [voxel_size[0],0.,0.,0.]
+    #nifti.header['srow_y'] =  [0.,voxel_size[1],0.,0.]
+    #nifti.header['srow_z'] =  [0.,0.,voxel_size[2],0.]
     nib.save(nifti, path) 
 
 def save_to_h5(data, path):
