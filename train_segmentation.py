@@ -61,7 +61,9 @@ def train(exp_config, fold_id, exp_cont = ""):
                         split_dict = split_dict, 
                         train_val_test = (exp_config.training_dataset, exp_config.validation_dataset, exp_config.test_dataset),
                         reduce_number = exp_config.num_training_files,
-                        num_workers = exp_config.num_workers)
+                        num_workers = exp_config.num_workers,
+                        norm_percentile = exp_config.norm_percentile,
+                        )
 
     
     # =========================

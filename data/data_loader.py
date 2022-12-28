@@ -21,7 +21,8 @@ def load_datasets(exp_config,
             split_dict_extra = None,
             train_val_test=(), 
             reduce_number = -1, 
-            num_workers=4):
+            num_workers=4,
+            norm_percentile = 99):
 
 
     train_loader, val_loader, test_loader = get_data_loaders_hdf53d(
@@ -36,7 +37,8 @@ def load_datasets(exp_config,
                                             split_dict_extra = split_dict_extra,
                                             train_val_test = train_val_test, 
                                             reduce_number = reduce_number, 
-                                            num_workers = num_workers)
+                                            num_workers = num_workers,
+                                            norm_percentile = 99)
 
     return train_loader, val_loader, test_loader
 
@@ -57,7 +59,18 @@ def get_data_loaders_npy(exp_config, batch_size, path_train, path_test, path_val
     
     return train_loader, val_loader, test_loader
 
-def get_single_data_loader_hdf53d(exp_config, batch_size, path_data, tf = custom_tf.ToTensor(), data_names = None, reduce_number = -1, num_workers = 4, extra_train_set = None, extra_data_names = []):
+def get_single_data_loader_hdf53d(exp_config, 
+                    batch_size, 
+                    path_data, 
+                    tf = custom_tf.ToTensor(), 
+                    data_names = None, 
+                    reduce_number = -1, 
+                    num_workers = 4, 
+                    extra_train_set = None, 
+                    extra_data_names = [],
+                    norm_percentile = 99,
+                    ):
+
     if not os.path.exists(path_data):
         raise FileNotFoundError(f"Could not find {path_data}.")
     
@@ -71,9 +84,9 @@ def get_single_data_loader_hdf53d(exp_config, batch_size, path_data, tf = custom
         if extra_data_names == None:
             x,y = preprocessing_utils.read_data_names(extra_train_set,keep_ending=False)
             extra_data_names = [{'image': x_el, 'target': y_el} for x_el, y_el in zip(x,y)]
-        ds = HDF5Dataset3D.HDF5Dataset3D_multiple(exp_config, path_data, data_names, path_2 = extra_train_set, data_names_2=extra_data_names, transform = tf, reduce_len = reduce_number,)
+        ds = HDF5Dataset3D.HDF5Dataset3D_multiple(exp_config, path_data, data_names, path_2 = extra_train_set, data_names_2=extra_data_names, transform = tf, reduce_len = reduce_number,norm_percentile = norm_percentile)
     else:
-        ds = HDF5Dataset3D.HDF5Dataset3D(exp_config, path_data, data_names, tf, reduce_number)
+        ds = HDF5Dataset3D.HDF5Dataset3D(exp_config, path_data, data_names, tf, reduce_number, norm_percentile = norm_percentile)
     loader = torch.utils.data.DataLoader(ds, batch_size = batch_size, shuffle = True, num_workers = min(num_workers, batch_size), pin_memory = True)
 
     return loader
@@ -90,7 +103,8 @@ def get_data_loaders_hdf53d(exp_config,
                 split_dict_extra = None, # not used
                 train_val_test = (), 
                 reduce_number = -1, 
-                num_workers = 4):
+                num_workers = 4,
+                norm_percentile = 99):
     
 
 
@@ -115,9 +129,36 @@ def get_data_loaders_hdf53d(exp_config,
 
         train_names, val_names, test_names = split_dict[train_set], split_dict[val_set], split_dict[test_set]
 
-    train_loader = get_single_data_loader_hdf53d(exp_config, batch_size, path_data, tf_train, train_names, reduce_number, num_workers, path_data_extra, train_names_extra)
-    val_loader = get_single_data_loader_hdf53d(exp_config, batch_size_test, path_data, tf_val, val_names, reduce_number, num_workers, None, val_names_extra)
-    test_loader = get_single_data_loader_hdf53d(exp_config, batch_size_test, path_data, tf_val, test_names, reduce_number, num_workers, None, test_names_extra)
+    train_loader = get_single_data_loader_hdf53d(exp_config = exp_config, 
+                                    batch_size = batch_size, 
+                                    path_data = path_data, 
+                                    tf = tf_train, 
+                                    data_names = train_names, 
+                                    reduce_number = reduce_number, 
+                                    num_workers = num_workers, 
+                                    extra_train_set = path_data_extra, 
+                                    extra_data_names = train_names_extra)
+
+
+    val_loader = get_single_data_loader_hdf53d(exp_config = exp_config, 
+                                    batch_size = batch_size_test, 
+                                    path_data = path_data, 
+                                    tf = tf_val, 
+                                    data_names = val_names, 
+                                    reduce_number = reduce_number, 
+                                    num_workers = num_workers, 
+                                    extra_train_set = None, 
+                                    extra_data_names = val_names_extra)
+
+    test_loader = get_single_data_loader_hdf53d(exp_config = exp_config, 
+                                    batch_size = batch_size_test, 
+                                    path_data = path_data, 
+                                    tf = tf_val, 
+                                    data_names = test_names, 
+                                    reduce_number = reduce_number, 
+                                    num_workers = num_workers, 
+                                    extra_train_set = None, 
+                                    extra_data_names = test_names_extra)
     
     return train_loader, val_loader, test_loader
 

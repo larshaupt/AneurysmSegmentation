@@ -189,6 +189,7 @@ class Options:
         self.parser.add_argument('--patch_xy_add', type=int, default=0)
         self.parser.add_argument('--crop_sides',choices=('True','False'), default='False')
         self.parser.add_argument('--rand_affine',choices=('True','False'), default='True')
+        self.parser.add_argument('--norm_percentile', type=float, default=99.0)
 
         self.parser.add_argument('--model_name', type=str, default='UNet', help='name of model')
         self.parser.add_argument('--num_blocks', type=int, default=5)

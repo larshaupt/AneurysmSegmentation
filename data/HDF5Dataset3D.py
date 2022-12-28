@@ -15,12 +15,13 @@ class HDF5Dataset3D(data.Dataset):
         path: Path to the folder containing the dataset (multiple npy files).
         transform: PyTorch transform to apply to every data instance (default = None).
     """
-    def __init__(self, exp_config, path, data_names = [], transform = None, reduce_len = -1, mask_path=""):
+    def __init__(self, exp_config, path, data_names = [], transform = None, reduce_len = -1, mask_path="", norm_percentile = 99):
         super().__init__()
         self.transform = transform
         self.main_path = path
         self.mask_path = mask_path
         self.reduce_len = reduce_len # for debugging, used in __len__
+        self.norm_perc = norm_percentile
 
 
         if self.reduce_len != -1:
@@ -77,13 +78,29 @@ class HDF5Dataset3D(data.Dataset):
 
         if len(self.patient_names) != 0:
             index_patient = np.where(self.patient_names == patient_name_current)[0][0]
-            min_value, perc99_value = self.data_min[index_patient], self.data_99_percentile[index_patient]
+            min_value = self.data_min[index_patient]
         else:
-            min_value, perc99_value = np.min(x), np.percentile(x, 99)
-        norm_params  = np.array([min_value, perc99_value])
+            min_value = np.min(x)
+        
 
         # scales the values between 0 and 1 
-        x = self.normalize_min_max(x,min_value,perc99_value)
+        if self.norm_perc == 99:
+            if len(self.patient_names) != 0:
+                max_scale = self.data_99_percentile[index_patient]
+            else:
+                max_scale = np.percentile(x, 99)
+
+        elif self.norm_perc == 100:
+            if len(self.patient_names) != 0:
+                max_scale = self.data_max[index_patient]
+            else:
+                max_scale = np.max(x)
+
+        else:
+            max_scale = np.percentile(x, self.norm_perc)
+        x = self.normalize_min_max(x,min_value,max_scale)
+
+        norm_params  = np.array([min_value, max_scale])
 
         x = x.astype(np.float32)
         y = y.astype(np.int8)
@@ -123,7 +140,7 @@ class HDF5Dataset3D(data.Dataset):
 
 class HDF5Dataset3D_multiple(HDF5Dataset3D):
 
-    def __init__(self, exp_config, path, data_names = [], path_2 = None, data_names_2 = None, transform = None, reduce_len = -1 ):
+    def __init__(self, exp_config, path, data_names = [], path_2 = None, data_names_2 = None, transform = None, reduce_len = -1, norm_percentile = 99 ):
         super().__init__(exp_config, path, data_names, transform, reduce_len)
 
         self.path_2 = path_2
