@@ -238,7 +238,7 @@ def convert_nrrd_to_nifti(filepath):
     image = reader.GetOutput()
 
     new_filepath = filepath[:-5] # remove the '.nrrd'
-    new_filepath = new_filepath + '.nii'
+    new_filepath = new_filepath + '.nii.gz'
 
 
 

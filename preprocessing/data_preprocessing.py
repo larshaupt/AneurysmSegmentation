@@ -171,7 +171,7 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
                 if len(seg) != 1:
                     print('Warning: Found multiple segmentation files')
                     print('Files found: ', seg)
-                    cands = [el for el in seg if "segmentation" in el.lower()]
+                    cands = [el for el in seg if ".seg" in el.lower()]
                     if cands != None:
                         seg = cands
                 nii_y = seg[0]
@@ -257,17 +257,17 @@ def run_process(every_n = 4, start_i = 0):
         voxel_size = (1.0, 1.0, 1.0) ,
         bias_corr = False, 
         preprocessed=True,
-        save_header = True, 
-        save_as="h5", 
+        save_header = False, 
+        save_as="nifti", 
         overwrite=True, 
         label_mapping='',
         include_mask=False,
         skip_label=False,
-        skip_tof=False,
+        skip_tof=True,
         )
 
 ps = []
-n = 6
+n = 8
 split_dif = n
 split_id = 0
 for k in range(split_id*split_dif, split_dif*(split_id+1)):

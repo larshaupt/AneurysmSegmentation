@@ -1,4 +1,6 @@
 # %%
+import sys
+sys.path.append('../')
 
 from data import transformations
 from data import data_loader, HDF5Dataset3D
@@ -19,17 +21,40 @@ from torchmetrics import Dice, Precision, Recall, AUROC
 from monai.metrics import DiceMetric
 from train.metrics import PrecisionMetric, RecallMetric
 from scipy.stats import multivariate_normal
+import scipy
+from nilearn.plotting import plot_anat, plot_roi
 
 
 #%%
 
+def print_stats(pred):
+    pred = pred.view(*pred.shape[-3:]).detach().numpy()
+    labels_target, N_target = cc3d.connected_components(pred, connectivity=26, return_N=True)
+    target_stat = cc3d.statistics(labels_target)
+    print(target_stat)
+    return labels_target, N_target, target_stat
 
+def plot_l(pred):
+    nifti = nib.Nifti1Image(pred.view(*pred.shape[-3:]).detach().numpy().astype(np.uint8), np.diag((*voxel_size, 1)))
+    plot_anat(nifti)
 
-experiment_name = 'USZ_hdf5_experiment_simple_1668375561'
+def plot_l(pred):
+    nifti = nib.Nifti1Image(pred.view(*pred.shape[-3:]).detach().numpy().astype(np.uint16)*32766, np.diag((*voxel_size, 1)))
+    plot_anat(nifti)
+
+def plot_r(pred, data):
+    nifti = nib.Nifti1Image(pred.view(*pred.shape[-3:]).detach().numpy().astype(np.uint8), np.diag((*voxel_size, 1)))
+    nifti_data = nib.Nifti1Image((data.view(*pred.shape[-3:]).detach().numpy()*32766).astype(np.uint16), np.diag((*voxel_size, 1)))
+    plot_roi(nifti, nifti_data, cmap='jet')
+
+# %%
+voxel_size = (0.3,0.3,0.6)
+experiment_name = 'USZ_BrainArtery_bias_sweep_1672089856'
 epoch = 69
-config_file = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/Training/pre_trained/%s/3d_experiment_0_simple.py' %(experiment_name)       
-model_weight_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/Training/pre_trained/%s/model_%i.pth' %(experiment_name, epoch)
-save_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/Training/predictions/%s/' %(experiment_name)
+model_name = 'best_model.pth'
+config_file = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/USZ_BrainArtery_bias_sweep_1672089856.json' %(experiment_name)       
+model_weight_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/0/%s' %(experiment_name, model_name)
+save_path ='/srv/beegfs02/scratch/brain_artery/data/training/predictions/%s/' %(experiment_name)
 img=True 
 gifs = False 
 nifti=True
@@ -37,14 +62,14 @@ split = 'test'
 num_slices = 5
 num=10
 tf_mode='test'
-scale_factor = (2.0/3.0, 2.0/3.0, 1.0)
+scale_factor = (10/3, 10/3, 5/3)
 save=False
 
 #%%
-
-exp_config = load_exp_config(config_file)
+exp_config = load_config(config_file)
 model = load_model(exp_config, model_weight_path)
-data_names = load_split(exp_config.path_split, exp_config.fold_id, split=split)
+data_names = load_split(exp_config.path_split.replace("_downscaled", "d"), exp_config.fold_id, split=split)
+
 if tf_mode == 'train':
     tf = exp_config.tf_train
 elif tf_mode == 'val' and hasattr(exp_config, 'tf_val'):
@@ -58,7 +83,7 @@ data_generator = iter(data_loader)
 
 #%%
 
-data, target, norm_params, name = next(data_generator)
+data, target, mask,norm_params, name = next(data_generator)
 
 # %%
 pred = model(data)
@@ -68,16 +93,23 @@ if exp_config.num_classes > 1:
 else:
     pred = torch.sigmoid(pred)
 pred = binarize(pred, 0.5)
+pred = pred.detach().numpy()[0,0,...]
+# %%
+
+pred = scipy.ndimage.binary_opening(pred, iterations=2).astype(np.uint8)
+pred = scipy.ndimage.binary_closing(pred, iterations=20).astype(np.uint8)
 
 # %%
 
-pred = take_n_largest_components(pred, n=10)
-pred = clip_outside_values(pred, thr=1)
+pred = take_n_largest_components(pred, n=1)
+#pred = remove_n_largest_components(pred, n=1)
+#pred = clip_outside_values(pred, thr=1)
 
 
 #%%
+pred_t = torch.Tensor(pred).view(1,1,*pred.shape[-3:])
 metric = MetricesStruct(exp_config.criterion_metric, prefix='')
-metric.update(binarize(pred), target, el_name=name[0])
+metric.update(binarize(pred_t), target, el_name=name[0])
 scores = metric.get_single_score_per_name()
 metric.print()
 # %%
@@ -129,7 +161,7 @@ for comp in target_stat['centroids']:
 
 #%%
 
-for i, (data, target, norm_params, name) in enumerate(data_loader):
+for i, (data, target, mask,norm_params, name) in enumerate(data_loader):
     if i >= num and num!=-1:
         break
     
@@ -175,7 +207,39 @@ def take_n_largest_components(labels, n=5):
         labels = torch.from_numpy(labels)
 
     return labels
+
+def remove_n_largest_components(labels, n=5):
+    orig_shape = labels.shape
+    if isinstance(labels, torch.Tensor):
+        torch_flag = True
+        labels = labels.detach().numpy()
+    else:
+        torch_flag = False
+    assert labels.ndim in [3,4,5], 'wrong input shape, too many or too few dimensions'
+    assert issubclass(labels.dtype.type, np.integer) or issubclass(labels.dtype.type, np.bool8), f'Wrong input type. Need to be int. Found: {labels.dtype}'
+    orig_shape = labels.shape
+    orig_dtype = labels.dtype
+
+    labels = np.reshape(labels, labels.shape[-3:])
+    labels_in = cc3d.connected_components(labels, connectivity=26, return_N=False)
     
+    stat = cc3d.statistics(labels)
+    cc_size = stat['voxel_counts']
+    largest_c = np.argsort(cc_size)
+
+    vals_to_keep = largest_c[:max(len(largest_c)-n,0)]
+    inds = labels == vals_to_keep[:, None, None, None]
+    labels[~np.any(inds, axis = 0)] = 0
+
+    labels = np.where(labels > 0, 1,0)
+
+    labels = np.reshape(labels, orig_shape)
+    labels = labels.astype(orig_dtype)
+
+    if torch_flag:
+        labels = torch.from_numpy(labels)
+
+    return labels
 
 def normalize_loc(loc, shape):
     loc_new = loc.copy()

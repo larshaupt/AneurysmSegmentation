@@ -13,7 +13,7 @@ import pandas as pd
 # if you don't know them, just ommit them (might evoke some errors)
 path_to_repo = "/scratch_net/biwidl311/lhauptmann/segmentation_3D"
 path_to_data = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Sharing/ADAM_Challenge/ADAM_release_subjs/"
-path_to_external_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/ADAM/data'
+path_to_external_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/ADAM111/data'
 path_to_exterinal_header = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/ADAM/header'
 
 import sys
@@ -55,9 +55,8 @@ MRI_file_list = MRI_file_list[np.argsort([el['name'] for el in MRI_file_list])]
         
 
 # %%
-npy=False
-out_shape= (560,640, 200)
-voxel_size = (0.3, 0.3, 0.6)
+
+voxel_size = (1.0, 1.0, 1.0)
 
 
 # %%
@@ -72,7 +71,7 @@ def compute_new_dim(old_dims, old_vox, new_vox):
         new_dim[i] = int(od * (ov/nv))
     return new_dim
 
-def process_file(mri_file, i):
+def process_file(mri_file, i, ):
     
     print(f"Processing {i} out of {len(MRI_file_list)}: {mri_file['name']}")
 
@@ -105,12 +104,9 @@ def process_file(mri_file, i):
     with open(os.path.join(path_to_exterinal_header, mri_file['name'] + '.json'), 'w') as f:
         f.write(json_object)
 
-    if npy:
-        with open(path_to_saved_x_file + ".npy", 'wb') as f:
-            np.save(f, nii_x_img.get_fdata())
-    else:
-        with h5py.File(path_to_saved_x_file + ".h5", 'w') as f:
-            f.create_dataset('data', data=nii_x_img.get_fdata()) 
+
+    with h5py.File(path_to_saved_x_file + ".h5", 'w') as f:
+        f.create_dataset('data', data=nii_x_img.get_fdata()) 
 
     # Process Segmentation label file (Y)
     seg = []
@@ -147,12 +143,8 @@ def process_file(mri_file, i):
     label_mapping = {1:4}
     nii_y_data_corr = map_labels(nii_y_data, label_mapping)
 
-    if npy:
-        with open(path_to_saved_y_file + ".npy", 'wb') as f:
-            np.save(f, nii_y_data_corr)
-    else:
-        with h5py.File(path_to_saved_y_file + ".h5", 'w') as f:
-            f.create_dataset('data', data=nii_y_data_corr) 
+    with h5py.File(path_to_saved_y_file + ".h5", 'w') as f:
+        f.create_dataset('data', data=nii_y_data_corr) 
 
 def run_process(every_n = 4, start_i = 0):
     for i in range(start_i, len(MRI_file_list), every_n):
