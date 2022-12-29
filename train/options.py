@@ -441,5 +441,8 @@ class Options:
         if not hasattr(self.opt, 'split_dict'):
             self.opt.split_dict = 'k_fold_split2_val.json'
 
+        if not hasattr(self.opt, 'rand_rotate'):
+            self.opt.rand_rotate = False
+
     def load_from_args(self):
         self.opt = copy.deepcopy(self.inp)
