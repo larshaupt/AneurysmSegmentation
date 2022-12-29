@@ -355,6 +355,54 @@ class CollapseLabelsTorch(object):
         sample['target'] = target
         return sample
 
+
+class TakeNeighboringLabels(object):
+    def __init__(self, n_vessel_label = 2, aneurysm_label = 3,n_vessels:dict=None) -> None:
+
+        if n_vessels is None:
+            self.n_vessels = {'MCA': [5,6],
+                'MA': [5,6],
+                'AComm': [8,9,11],
+                'ACA': [9,10],
+                'Pericallosa': [9,10], # Same as ACA
+                'PComm': [1,13,16],
+                'BA': [3,16],
+                'ICA': [1,5,8],
+                'PCA': [3,16,17],
+                'PICA': [3,13],
+                'VA': [3],
+                'PG' : []
+                } 
+        else:
+            self.n_vessels = n_vessels
+
+        self.n_vessel_label = n_vessel_label
+        self.aneurysm_label = aneurysm_label
+
+    def __call__(self, sample) -> dict:
+        pdb.set_trace()
+        target, name = sample['target'], sample['name']
+        n_v_cand =  [self.n_vessels[key] for key in self.n_vessels.keys() if key.lower() in name.lower()]
+        if len(n_v_cand) == 1:
+            n_v = n_v_cand[0]
+        elif len(n_v_cand) > 1:
+            print(f'TakeNeighboringLabels: Found too many possible aneurysm classes fp {name}: {n_v_cand}') 
+            n_v = n_v_cand[0]
+        else:
+            print(f'TakeNeighboringLabels: Found no possible aneurysm class for {name}')
+            n_v = []
+
+        for label in n_v:
+            target = torch.where(target==label, self.n_vessel_label, target)
+
+        # remove all other labels than aneurysm and neighboring vessels
+        labels_to_keep = [self.n_vessel_label, self.aneurysm_label]
+        target = target*torch.sum(torch.stack([target == e for e in labels_to_keep]), dim=0) 
+        
+
+        sample['target'] = target
+        return sample
+
 class MapLabelTorch(object):
     def __init__(self, label_origin:int, label_target:int) -> None:
         self.label_origin = label_origin

@@ -111,7 +111,7 @@ class HDF5Dataset3D(data.Dataset):
             y = np.expand_dims(y, axis=0)
 
 
-        sample = {'image': x, 'target': y, 'params': norm_params, 'mask': mask}
+        sample = {'image': x, 'target': y, 'params': norm_params, 'mask': mask, 'name': patient_name_current}
 
         if self.transform != None:
             

@@ -158,6 +158,8 @@ class Options:
         self.parser.add_argument('--k_fold',choices=('True','False'), default='False', help='Doing k-fold?')
         self.parser.add_argument('--k_fold_k', type=int, default = 5)
         
+
+        self.parser.add_argument('--neighboring_vessels', choices=('True','False'), default='False', help='neighboring_vessels')
         self.parser.add_argument('--num_classes', type=int, default=1, help=' number of classes')
         self.parser.add_argument('--collapse_classes', choices=('True','False'), default='False', help='Wether to collapse multiple classes into one')
         self.parser.add_argument('--pretrained_weights', default='', help='path to pretrained_weights')
@@ -205,7 +207,7 @@ class Options:
 
     def interpret_params(self):
 
-        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate"]:
+        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate", "neighboring_vessels"]:
             if hasattr(self.opt, el):
                 if isinstance(vars(self.opt)[el], str):
                     vars(self.opt)[el] = eval(vars(self.opt)[el])
@@ -241,11 +243,19 @@ class Options:
             label_transform = transformations.BinarizeSingleLabelTorch(label=old_target_label)
             new_target_label = 1
         elif self.opt.num_classes == 3:
-            label_transform = transformations.ComposeTransforms([
-                transformations.CollapseLabelsTorch([1,2,3,    5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]),
-                transformations.MapLabelTorch(old_target_label,2),
-                transformations.OneHotEncodeLabel(self.opt.num_classes)
-            ])
+            if not self.opt.neighboring_vessels:
+                label_transform = transformations.ComposeTransforms([
+                    transformations.CollapseLabelsTorch([1,2,3,    5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]),
+                    transformations.MapLabelTorch(old_target_label,2),
+                    transformations.OneHotEncodeLabel(self.opt.num_classes)
+                ])
+            else:
+                label_transform = transformations.ComposeTransforms([
+                    transformations.TakeNeighboringLabels(n_vessel_label=1, aneurysm_label=4),
+                    transformations.MapLabelTorch(old_target_label,2),
+                    transformations.OneHotEncodeLabel(self.opt.num_classes)
+                ]) 
+                
             new_target_label = 2
 
         elif self.opt.num_classes == 22:
