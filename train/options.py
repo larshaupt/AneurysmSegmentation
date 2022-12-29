@@ -23,9 +23,10 @@ class Options:
 
     def __init__(self, mode:str = 'train', 
                 verbose:bool = True, 
-                config_file:str = ''):
+                config_file:str = '',
+                **kwargs):
 
-
+        self.kwargs = kwargs
         self.opt = Namespace()
         self.inp_dict = dict()
         self.file_cont = ""
@@ -60,6 +61,7 @@ class Options:
             
             if not hasattr(self.opt, 'criterion_metric_train'):
                 self.opt.criterion_metric_train = self.opt.criterion_metric
+            
 
 
         else: # needs extra evalution of parameters
@@ -70,6 +72,7 @@ class Options:
             else: # self.source == "args"
 
                 self.load_from_args()
+
             
             self.interpret_params()
             
@@ -190,6 +193,7 @@ class Options:
         self.parser.add_argument('--crop_sides',choices=('True','False'), default='False')
         self.parser.add_argument('--rand_affine',choices=('True','False'), default='True')
         self.parser.add_argument('--norm_percentile', type=float, default=99.0)
+        self.parser.add_argument('--rand_rotate',choices=('True','False'), default='False')
 
         self.parser.add_argument('--model_name', type=str, default='UNet', help='name of model')
         self.parser.add_argument('--num_blocks', type=int, default=5)
@@ -201,9 +205,10 @@ class Options:
 
     def interpret_params(self):
 
-        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine"]:
-            if isinstance(vars(self.opt)[el], str):
-                vars(self.opt)[el] = eval(vars(self.opt)[el])
+        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate"]:
+            if hasattr(self.opt, el):
+                if isinstance(vars(self.opt)[el], str):
+                    vars(self.opt)[el] = eval(vars(self.opt)[el])
         #################### GENERAL PARAMETERS ####################
         timestamp = int(time.time())
         self.opt.experiment_name = '%s_sweep_%d'%(self.opt.dataset, timestamp)
@@ -266,7 +271,7 @@ class Options:
                 transformations.CropRandom((np.array(patch_size_train)/2).astype(int), prob= self.opt.augment_probability) if self.opt.extra_cropping else None,
                 transformations.PadToDivisible(16),
                 transformations.RandAffine() if self.opt.rand_affine else None,
-                transformations.RandomRotate90(prob=self.opt.augment_probability) if patch_size_train.count(patch_size_train[0]) == len(patch_size_train) else None,
+                transformations.RandomRotate90(prob=self.opt.augment_probability) if (patch_size_train.count(patch_size_train[0]) == len(patch_size_train) and self.opt.rand_rotate) else None,
                 transformations.RandomFlip(prob=self.opt.augment_probability),
                 transformations.RandElastic(sigma_range=(5,7), magnitude_range=(10,50), prob=self.opt.augment_probability),
                 transformations.RandGaussianNoise(prob=0.1, std=self.opt.augment_probability),
@@ -427,7 +432,10 @@ class Options:
     def load_from_json(self, config_file):
         
         with open(config_file, 'r') as infile:
-            self.opt = Namespace(**json.load(infile))
+            opt_dict = json.load(infile)
+            if self.kwargs != None:
+                opt_dict.update(self.kwargs)
+            self.opt = Namespace(**opt_dict)
         self.file_cont = str(self.opt)
 
         if not hasattr(self.opt, 'split_dict'):

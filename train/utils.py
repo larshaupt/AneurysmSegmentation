@@ -49,6 +49,9 @@ def load_split(path_dict:str, fold_id:int, split:str = "") -> dict|list:
 def binarize(pred, threshold=0.5):
     if not isinstance(pred, Tensor):
         pred = Tensor(pred)
+    
+    if pred.dtype == torch.bool:
+        pred = pred.int()
 
     orig_shape = pred.shape
 

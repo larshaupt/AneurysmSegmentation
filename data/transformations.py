@@ -349,7 +349,7 @@ class CollapseLabelsTorch(object):
         self.target_label = self.labels_to_collapse.pop() # take the lowest element and remove it from list
 
     def __call__(self, sample) -> dict:
-        image, target = sample['image'], sample['target']
+        target = sample['target']
         for label in self.labels_to_collapse:
             target = torch.where(target==label, self.target_label, target)
         sample['target'] = target

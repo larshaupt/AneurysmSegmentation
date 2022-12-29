@@ -140,15 +140,15 @@ def write_file_dict(path, save=True):
 
     return file_df
 
-write_file_dict("/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias111/data")
+#write_file_dict("/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias111/data")
 # %%
 #for fold in os.listdir(os.path.join(path_to_external_data_hd5f, 'folds')):
 #    fold_path = os.path.join(path_to_external_data_hd5f, 'folds', fold)
 #    for split_set in os.listdir(fold_path):
 #        write_file_dict(os.path.join(fold_path, split_set))
-path = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias111/data"
-for el in os.listdir(path):
-    os.rename(os.path.join(path, el), os.path.join(path, el.replace("__" ,"_")))
+#path = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias111/data"
+#for el in os.listdir(path):
+#    os.rename(os.path.join(path, el), os.path.join(path, el.replace("__" ,"_")))
 # %%
 #df = pd.read_csv('/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_hdf5/folds/0/train/file_dict.csv')
 #x,y = read_data_names(path_to_external_data)
@@ -180,7 +180,10 @@ for x_file in x:
 def copy_labels_and_images(path, label_dir, image_dir, name_base, overwrite=False):
 
     i = 0
-    for file_dir in os.listdir(path):
+
+    file_dirs = list(os.listdir(path))
+    file_dirs = sorted(file_dirs)
+    for file_dir in file_dirs:
         
         file_path = os.path.join(path, file_dir)
         if not os.path.isdir(file_path):

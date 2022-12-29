@@ -1,7 +1,7 @@
 # %%
 
 import sys
-sys.path.append('/scratch/lhauptmann/segmentation_3D')
+sys.path.append('../')
 
 from importlib.machinery import SourceFileLoader
 from data import data_loader
@@ -20,8 +20,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-
-file_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/USZ_hdf5d2_sweep_1671314512/USZ_hdf5d2_sweep_1671314512.json'
+# %%
+file_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/USZ_BrainArtery_bias_sweep_1672252138/USZ_BrainArtery_bias_sweep_1672252138.json'
 options = Options(config_file=file_path)
 exp_config = options.get_opt() # exp_config stores configurations in the given config file under experiments folder.
 
@@ -49,16 +49,16 @@ source_train_loader, source_val_loader, source_test_loader = data_loader.load_da
                                                                         reduce_number=10)
 """
 source_loader = data_loader.get_single_data_loader_hdf53d(
-    exp_config, 
-    1, 
-    exp_config.path_data, 
-    tf = exp_config.tf_train, 
-    data_names = split_dict['train'], 
-    reduce_number = -1, 
-    num_workers = 0)
+                    exp_config, 
+                    1, 
+                    exp_config.path_data, 
+                    tf = exp_config.tf_train, 
+                    data_names = split_dict['train'], 
+                    reduce_number = -1, 
+                    num_workers = 0)
 source_iter = iter(source_loader)
 # %%
-data, target, norm_params, names = next(source_iter)
+data, target, mask, norm_params, names = next(source_iter)
 print(names)
 #integrate_intensity(data)
 plt.imshow(data[0,0,:,:,40])

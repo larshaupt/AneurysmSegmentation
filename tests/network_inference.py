@@ -117,7 +117,9 @@ def save_pred(
         target_label = 4):
 
     print(f'Saving {name} to {path_to_imgs} ')
-    target_channel = target_label if pred.shape[1] >=target_label else 0
+
+
+    target_channel = target_label if pred.shape[1] >=target_label else pred.shape[1] - 1
     pred_bin = ut.binarize(pred).detach().numpy()[0,0,...]
     if binarize_target:
         target = ut.binarize(target)
@@ -126,6 +128,8 @@ def save_pred(
         target = target.detach().numpy()[0,target_channel,...]
     
     pred = pred.detach().numpy()[0,target_channel,...]
+
+
     data = data.detach().numpy()[0,0,...]
 
     name = name[0]
@@ -182,11 +186,11 @@ def save_pred(
 
 
 #%%
-experiment_name = 'USZ_hdf5d2_sweep_1671843466'
+experiment_name = 'USZ_BrainArtery_bias_sweep_1672252497'
 epoch = 290
 model_name = 'model_%i.pth'%(epoch)
 model_name = 'best_model.pth'
-config_file = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/USZ_hdf5d2_sweep_1671843466.json' %(experiment_name)       
+config_file = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/%s.json' %(experiment_name, experiment_name)       
 model_weight_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/4/' %(experiment_name) + model_name
 save_path = '/srv/beegfs02/scratch/brain_artery/data/training/predictions/%s/' %(experiment_name)
 make_predictions(model_weight_path, 
@@ -195,11 +199,11 @@ make_predictions(model_weight_path,
             img=True,  
             gifs = False, 
             nifti=True, 
-            split = 'test', 
+            split = 'val', 
             num_slices = 5, 
             num=10 ,
-            tf_mode='test', 
-            scale_factor = (2.0/3.0, 2.0/3.0, 1.0),
+            tf_mode='val', 
+            scale_factor = (1.0, 1.0, 1.0),
             save = True,
             binarize_target = True)
 

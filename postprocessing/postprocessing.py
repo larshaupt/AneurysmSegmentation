@@ -5,6 +5,7 @@ sys.path.append('../')
 from data import transformations
 from data import data_loader, HDF5Dataset3D
 from train.utils import *
+from train.options import Options
 from preprocessing.preprocessing_utils import integrate_intensity, animate_img
 from train.metrics import MetricesStruct
 
@@ -24,6 +25,7 @@ from scipy.stats import multivariate_normal
 import scipy
 from nilearn.plotting import plot_anat, plot_roi
 
+path_to_pretrained_weights = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained'
 
 #%%
 
@@ -47,53 +49,75 @@ def plot_r(pred, data):
     nifti_data = nib.Nifti1Image((data.view(*pred.shape[-3:]).detach().numpy()*32766).astype(np.uint16), np.diag((*voxel_size, 1)))
     plot_roi(nifti, nifti_data, cmap='jet')
 
+def plot_overlay(pred, data):
+    plt.imshow(data.view(*data.shape[-3:]).detach().numpy()[data.shape[-3]//2,...], cmap='gray')
+    plt.imshow(pred.view(*pred.shape[-3:]).detach().numpy()[pred.shape[-3]//2,...], cmap='jet', alpha=0.5)
+
+def load_opt(exp_config):
+    opt = Options(config_file=exp_config)
+    opt_dict = opt.get_opt()
+    return opt_dict
+
+def load_data_generator(exp_config , data_names, tf_mode='test', batch_size=1):
+
+    if tf_mode == 'train':
+        tf = exp_config.tf_train
+    elif tf_mode == 'val' and hasattr(exp_config, 'tf_val'):
+        tf = exp_config.tf_val 
+    else:
+        tf = exp_config.tf_test
+    ds_data = HDF5Dataset3D.HDF5Dataset3D(exp_config, exp_config.path_data, data_names, tf)
+    data_loader = torch.utils.data.DataLoader(ds_data, batch_size = batch_size, shuffle = False, num_workers = 0, pin_memory=False)
+    data_generator = iter(data_loader)
+    return data_generator
+
+def inference(data, model, onehot=False):
+    pred = model(data)
+    if exp_config.num_classes > 1:
+        pred = torch.softmax(pred, dim=1)
+    else:
+        pred = torch.sigmoid(pred)
+    if not onehot:
+        pred = binarize(pred, 0.5)
+    pred = pred.detach().numpy()
+    return pred
 # %%
+
+
 voxel_size = (0.3,0.3,0.6)
-experiment_name = 'USZ_BrainArtery_bias_sweep_1672089856'
-epoch = 69
 model_name = 'best_model.pth'
-config_file = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/USZ_BrainArtery_bias_sweep_1672089856.json' %(experiment_name)       
+# %%
+experiment_name = 'USZ_BrainArtery_bias_sweep_1672252497'
+config_file = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/%s.json' %(experiment_name, experiment_name)       
 model_weight_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/0/%s' %(experiment_name, model_name)
-save_path ='/srv/beegfs02/scratch/brain_artery/data/training/predictions/%s/' %(experiment_name)
-img=True 
-gifs = False 
-nifti=True
-split = 'test' 
-num_slices = 5
-num=10
-tf_mode='test'
-scale_factor = (10/3, 10/3, 5/3)
-save=False
-
 #%%
-exp_config = load_config(config_file)
+exp_config = load_opt(config_file)
+exp_config.num_classes = 1
 model = load_model(exp_config, model_weight_path)
-data_names = load_split(exp_config.path_split.replace("_downscaled", "d"), exp_config.fold_id, split=split)
 
-if tf_mode == 'train':
-    tf = exp_config.tf_train
-elif tf_mode == 'val' and hasattr(exp_config, 'tf_val'):
-    tf = exp_config.tf_val 
-else:
-    tf = exp_config.tf_test
-path_to_gifs, path_to_imgs, path_to_nifti = None, None, None
-ds_data = HDF5Dataset3D.HDF5Dataset3D(exp_config, exp_config.path_data, data_names, tf)
-data_loader = torch.utils.data.DataLoader(ds_data, batch_size = 1, shuffle = False, num_workers = 0, pin_memory=False)
-data_generator = iter(data_loader)
+# %%
+
+experiment_name2 = 'USZ_BrainArtery_bias_sweep_1672252497'
+config_file2 = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/%s.json' %(experiment_name2, experiment_name2)    
+model_weight_path2 = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/0/%s' %(experiment_name2, model_name)
+
+# %%
+exp_config2 = load_opt(config_file2)
+model2 = load_model(exp_config2, model_weight_path2)
+# %%
+split = 'val'
+data_names = load_split(exp_config.path_split.replace("_downscaled", "d"), exp_config.fold_id, split=split)
+tf_mode = 'val'
+
+data_generator = load_data_generator(exp_config, data_names, tf_mode=tf_mode, batch_size=1)
 
 #%%
 
 data, target, mask,norm_params, name = next(data_generator)
 
 # %%
-pred = model(data)
+pred = inference(data, model, onehot=True)
 
-if exp_config.num_classes > 1:
-    pred = torch.softmax(pred, dim=1)
-else:
-    pred = torch.sigmoid(pred)
-pred = binarize(pred, 0.5)
-pred = pred.detach().numpy()[0,0,...]
 # %%
 
 pred = scipy.ndimage.binary_opening(pred, iterations=2).astype(np.uint8)
@@ -107,9 +131,9 @@ pred = take_n_largest_components(pred, n=1)
 
 
 #%%
-pred_t = torch.Tensor(pred).view(1,1,*pred.shape[-3:])
+pred_t = torch.Tensor(pred).view(1,*pred.shape[-4:])
 metric = MetricesStruct(exp_config.criterion_metric, prefix='')
-metric.update(binarize(pred_t), target, el_name=name[0])
+metric.update(torch.nn.functional.one_hot(binarize(pred_t), num_classes=3).view(1,-1, *pred_t.shape[-3:]), target, el_name=name[0])
 scores = metric.get_single_score_per_name()
 metric.print()
 # %%
