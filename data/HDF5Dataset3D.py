@@ -173,6 +173,3 @@ class HDF5Dataset3D_multiple(HDF5Dataset3D):
             print('Did not find data dict for ',path_data_dict )
             #data_df = None
             #self.patient_names, self.data_min, self.data_max, self.data_99_percentile = [],[],[],[],
-
-        print(self.image_paths)
-        print(self.patient_names)
