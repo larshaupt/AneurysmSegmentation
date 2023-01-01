@@ -454,5 +454,8 @@ class Options:
         if not hasattr(self.opt, 'rand_rotate'):
             self.opt.rand_rotate = False
 
+        if not hasattr(self.opt, 'neighboring_vessels'):
+            self.opt.neighboring_vessels = False
+
     def load_from_args(self):
         self.opt = copy.deepcopy(self.inp)
