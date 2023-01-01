@@ -68,9 +68,7 @@ class DiceMetric():
         FN = (torch.where(pred==0, 1,0)*target).sum()
         FP = (torch.where(target==0, 1,0)*pred).sum()
         if 2*TP + FP + FN == 0:
-            if TP == 0:
-                return 1.0
-            return 0.0
+            return np.NAN
         return 2*TP / (2*TP + FP + FN)
 
 
@@ -85,9 +83,7 @@ class RecallMetric():
         FN = (torch.where(pred==0, 1,0)*target).sum()
 
         if TP+FN == 0:
-            if TP == 0:
-                return 1.0
-            return 0.0
+            return np.NaN
             
         return TP / (TP+FN)
 
@@ -103,9 +99,7 @@ class PrecisionMetric():
         FP = (torch.where(target==0, 1,0)*pred).sum()
 
         if TP+FP == 0:
-            if TP == 0:
-                return 1.0
-            return 0.0
+            return np.NaN
             
         return TP / (TP+FP)
 
@@ -309,8 +303,18 @@ class VolumetricSimilarityMetric():
         
         #numerator = abs(test_statistics.GetSum() - result_statistics.GetSum())
         #denominator = test_statistics.GetSum() + result_statistics.GetSum()
-        numerator = abs(torch.sum(target) - torch.sum(pred))
-        denominator = torch.sum(target) - torch.sum(pred)
+
+        pred, target = convert_to_tensor(pred), convert_to_tensor(target)
+        assert pred.shape[0] == 1 and target.shape[0] == 1 
+        pred, target = ut.binarize(pred), ut.binarize(target)
+
+        
+        FP  = (~target*pred).sum()
+        FN = (target*~pred).sum()
+        TP  = (target*pred).sum()
+
+        numerator = abs(FN - FP)
+        denominator = 2*TP + FP + FN
         if denominator > 0:
             vs = 1 - (numerator / denominator)
         else:
