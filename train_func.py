@@ -29,7 +29,8 @@ def _train(exp_config, model, loader_train, epoch, device, optimizer, criterion_
 
     train_metrics = MetricesStruct(exp_config.criterion_metric_train, prefix='train_')
     counter = 0
-    print('Training epoch ', str(epoch))
+    current_time = time.ctime(time.time())
+    print(f'{current_time}: Training epoch ', str(epoch))
     with tqdm(loader_train, unit='batch') as tepoch:
         #timer.take_time('Load Data')
         for data, target, mask, norm_params, name in tepoch:
@@ -120,6 +121,7 @@ def _validate(exp_config, model, loader_val, epoch, device, val_loss, logger):
 
 
 
+                
                 if hasattr(exp_config, "tf_post"):
                     sample = {'image': data.squeeze(0), 'target': pred.squeeze(0)}
                     sample = exp_config.tf_post(sample)
