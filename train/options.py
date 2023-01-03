@@ -474,6 +474,9 @@ class Options:
 
         if not hasattr(self.opt, 'neighboring_vessels'):
             self.opt.neighboring_vessels = False
+            
+        if not hasattr(self.opt, 'det_val_crop'):
+            self.opt.det_val_crop = False
 
     def load_from_args(self):
         self.opt = copy.deepcopy(self.inp)
