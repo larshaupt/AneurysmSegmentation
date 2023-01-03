@@ -103,7 +103,7 @@ class HDF5Dataset3D(data.Dataset):
         norm_params  = np.array([min_value, max_scale])
 
         x = x.astype(np.float32)
-        y = y.astype(np.int8)
+        y = y.astype(np.uint8)
         
         if x.ndim == 3:
             x = np.expand_dims(x,axis=0)
