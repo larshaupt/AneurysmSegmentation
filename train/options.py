@@ -196,6 +196,7 @@ class Options:
         self.parser.add_argument('--rand_affine',choices=('True','False'), default='True')
         self.parser.add_argument('--norm_percentile', type=float, default=99.0)
         self.parser.add_argument('--rand_rotate',choices=('True','False'), default='False')
+        self.parser.add_argument('--det_val_crop',choices=('True','False'), default='False')
 
         self.parser.add_argument('--model_name', type=str, default='UNet', help='name of model')
         self.parser.add_argument('--num_blocks', type=int, default=5)
@@ -207,7 +208,7 @@ class Options:
 
     def interpret_params(self):
 
-        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate", "neighboring_vessels"]:
+        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate", "neighboring_vessels", "det_val_crop"]:
             if hasattr(self.opt, el):
                 if isinstance(vars(self.opt)[el], str):
                     vars(self.opt)[el] = eval(vars(self.opt)[el])
@@ -291,7 +292,7 @@ class Options:
         self.opt.tf_val = transformations.ComposeTransforms([
                 transformations.ToTensor(),
                 transformations.CropSidesThreshold() if self.opt.crop_sides else None,
-                transformations.CropForeground(patch_size_test, label=old_target_label) if not self.opt.validate_whole_vol else None,
+                None if self.opt.validate_whole_vol else transformations.CropForeground(patch_size_test, label=old_target_label) if not self.opt.det_val_crop else transformations.CropForegroundCenter(target_label=old_target_label),
                 transformations.PadToDivisible(16),
                 label_transform,
                 ], debug=False)
