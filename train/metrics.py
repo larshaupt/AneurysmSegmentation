@@ -255,7 +255,7 @@ class HausDorffMetric():
 
         #h_test_image = sitk.Subtract(test_image, e_test_image)
         #h_result_image = sitk.Subtract(result_image, e_result_image)
-        h_target = target- e_target
+        h_target = target - e_target
         h_pred = pred- e_pred
 
 
@@ -309,9 +309,9 @@ class VolumetricSimilarityMetric():
         pred, target = ut.binarize(pred), ut.binarize(target)
 
         
-        FP  = (~target*pred).sum()
-        FN = (target*~pred).sum()
-        TP  = (target*pred).sum()
+        FN = (torch.where(pred==0, 1,0)*target).sum()
+        FP = (torch.where(target==0, 1,0)*pred).sum()
+        TP = (pred*target).sum()
 
         numerator = abs(FN - FP)
         denominator = 2*TP + FP + FN

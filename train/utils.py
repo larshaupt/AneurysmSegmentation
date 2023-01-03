@@ -120,8 +120,8 @@ def load_exp_config(exp_config_path):
 
     return exp_config
 
-def load_config(config_path):
-    op = Options(config_file = config_path)
+def load_config(config_path, verbose=False):
+    op = Options(config_file = config_path, verbose=verbose)
     return op.opt
 
 
