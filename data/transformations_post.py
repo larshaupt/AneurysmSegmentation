@@ -1,4 +1,7 @@
 import torch
+import numpy as np
+import cc3d
+
 
 
 class MaskOutSidesThreshold(object):
@@ -76,3 +79,55 @@ def crop_till_threshold(img, threshold, axes:list = ["x", "y", "z"], smooth = 1)
 
     return threshold_locs
 
+
+def remove_small_components(labels, thr=100):
+    orig_shape = labels.shape
+    if isinstance(labels, torch.Tensor):
+        torch_flag = True
+        labels = labels.detach().numpy()
+    else:
+        torch_flag = False
+    assert labels.ndim in [3,4,5], 'wrong input shape, too many or too few dimensions'
+    assert issubclass(labels.dtype.type, np.integer) or issubclass(labels.dtype.type, np.bool8), f'Wrong input type. Need to be int. Found: {labels.dtype}'
+    orig_shape = labels.shape
+    orig_dtype = labels.dtype
+
+    labels = np.reshape(labels, labels.shape[-3:])
+    labels_in = cc3d.connected_components(labels.astype(int), connectivity=26, return_N=False)
+    
+    stat = cc3d.statistics(labels_in)
+    cc_size = stat['voxel_counts']
+
+    vals_to_keep = np.squeeze(np.argwhere(cc_size > thr))
+
+    inds = labels_in == vals_to_keep[:, None, None, None]
+    labels[~np.any(inds, axis = 0)] = 0
+
+
+    labels = np.reshape(labels, orig_shape)
+    labels = labels.astype(orig_dtype)
+
+    if torch_flag:
+        labels = torch.from_numpy(labels)
+
+    return labels
+
+
+class Threshold_cc(object):
+    def __init__(self, threshold:int = 100) -> None:
+        self.threshold = threshold
+
+    def __call__(self, sample:dict) -> dict:
+        image, target = sample['image'], sample['target']
+        self.target = remove_small_components(target, thr=self.threshold)
+        return {'image': image, 'target': target}
+
+class Threshold_data(object):
+    def __init__(self, threshold:float = 1.0) -> None:
+        self.threshold = threshold
+
+    def __call__(self, sample:dict) -> dict:
+        image, target = sample['image'], sample['target']
+        mask = image > self.threshold
+        image = image * mask
+        return {'image': image, 'target': target}

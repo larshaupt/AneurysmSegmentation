@@ -593,7 +593,7 @@ class CropForeground(object):
 
 class CropForegroundCenter(object):
 
-    def __init__(self, target_label, k_divisible = 16, margin=8, allow_smaller = True) -> None:
+    def __init__(self, target_label, k_divisible = 16, margin=24, allow_smaller = True) -> None:
         self.target_label = target_label
         self.k_divisible = k_divisible
         self.margin = margin
