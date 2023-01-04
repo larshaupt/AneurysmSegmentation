@@ -197,6 +197,7 @@ class Options:
         self.parser.add_argument('--norm_percentile', type=float, default=99.0)
         self.parser.add_argument('--rand_rotate',choices=('True','False'), default='False')
         self.parser.add_argument('--det_val_crop',choices=('True','False'), default='False')
+        self.parser.add_argument('--margin_crop', type=int, default=32)
         self.parser.add_argument('--val_threshold_cc',type = int, default=0)
         self.parser.add_argument('--val_threshold_data',type = float, default=0.0)
 
@@ -293,7 +294,7 @@ class Options:
         self.opt.tf_val = transformations.ComposeTransforms([
                 transformations.ToTensor(),
                 transformations.CropSidesThreshold() if self.opt.crop_sides else None,
-                None if self.opt.validate_whole_vol else transformations.CropForeground(patch_size_test, label=old_target_label) if not self.opt.det_val_crop else transformations.CropForegroundCenter(target_label=old_target_label),
+                None if self.opt.validate_whole_vol else transformations.CropForeground(patch_size_test, label=old_target_label) if not self.opt.det_val_crop else transformations.CropForegroundCenter(target_label=old_target_label, margin = self.opt.margin_crop),
                 transformations.PadToDivisible(16),
                 label_transform,
                 ], debug=False)
