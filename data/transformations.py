@@ -593,13 +593,20 @@ class CropForeground(object):
 
 class CropForegroundCenter(object):
 
-    def __init__(self, target_label, k_divisible = 16, margin=24, allow_smaller = True) -> None:
+    def __init__(self, target_label, k_divisible = 16, margin=32, allow_smaller = True) -> None:
         self.target_label = target_label
         self.k_divisible = k_divisible
         self.margin = margin
         def select_target_label(x):
             return x == self.target_label
-        self.crop  = transforms.CropForegroundd(keys = ['image', 'target'], source_keys = 'target',select_fn=select_target_label, source_key='target', margin=self.margin, k_divisible=self.k_divisible, allow_smaller=allow_smaller)
+        self.crop  = transforms.CropForegroundd(
+            keys = ['image', 'target'], 
+            select_fn =select_target_label, 
+            source_key ='target', 
+            margin=self.margin, 
+            k_divisible =self.k_divisible, 
+            allow_smaller =allow_smaller,
+            mode = "constant")
 
     def __call__(self, sample:dict) -> dict:
         sample = self.crop(sample)
