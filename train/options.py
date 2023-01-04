@@ -163,6 +163,7 @@ class Options:
         self.parser.add_argument('--num_classes', type=int, default=1, help=' number of classes')
         self.parser.add_argument('--collapse_classes', choices=('True','False'), default='False', help='Wether to collapse multiple classes into one')
         self.parser.add_argument('--pretrained_weights', default='', help='path to pretrained_weights')
+        self.parser.add_argument('--pretrained_weights_dict', default='', help='path of pretrained_weights')
 
         self.parser.add_argument('--loss', default='weightedBCE', help='loss')
         self.parser.add_argument('--learning_rate', type=float, default=1e-3, help=' initial learning rate')
@@ -226,6 +227,8 @@ class Options:
             self.opt.path_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/%s/data/'%(self.opt.dataset)
         if self.opt.path_split == "":
             self.opt.path_split = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/%s/%s'%(self.opt.dataset, self.opt.split_dict)
+
+        path_to_pre_trained_old = self.opt.path_to_save_pretrained_models
         self.opt.path_to_save_pretrained_models = os.path.join(self.opt.path_to_save_pretrained_models ,self.opt.experiment_name)
 
         if self.opt.extra_dataset != "":
@@ -238,6 +241,16 @@ class Options:
             self.opt.grid_validation = False
         if self.opt.sweep:
             self.opt.name = self.opt.name + '_' + os.environ['SLURM_ARRAY_TASK_ID']
+
+        if self.opt.pretrained_weights_dict != "":
+            weights_dict = pd.read_csv(self.opt.pretrained_weights_dict)
+            weights_name = weights_dict.iloc[self.opt.fold_id]['name']
+            ind = weights_name[::-1].find('_')
+            name = weights_name[:-ind-1]
+            fold = int(weights_name[-ind:])
+            assert fold == self.opt.fold_id, print(fold, self.opt.fold_id)
+
+            self.opt.pretrained_weights = os.path.join(path_to_pre_trained_old, name, str(fold), 'best_model.pth')
 
         #################### LABEL PROCESSING ####################
         old_target_label = self.opt.target_label

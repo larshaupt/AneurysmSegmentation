@@ -120,7 +120,7 @@ def _validate(exp_config, model, loader_val, epoch, device, val_loss, logger):
                         pred = torch.sigmoid(pred_logits)
 
 
-
+                
                 
                 if hasattr(exp_config, "tf_post"):
                     sample = {'image': data.squeeze(0), 'target': pred.squeeze(0)}
@@ -196,7 +196,11 @@ def train_segmentation_network(
     val_loss = copy.deepcopy(criterion_loss).to(device)
     
     if exp_config.pretrained_weights != '':
-        state_dict = torch.load(exp_config.pretrained_weights)
+
+        if device == torch.device('cpu'):
+            state_dict = torch.load(exp_config.pretrained_weights, map_location=torch.device('cpu'))
+        else: # device == torch.device('gpu'):
+            state_dict = torch.load(exp_config.pretrained_weights)
         model.load_state_dict(state_dict)
     
     model.to(device)

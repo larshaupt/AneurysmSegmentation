@@ -136,7 +136,13 @@ class TargetLabelMetric():
         
 
     def __call__(self, pred: Tensor, target: Tensor):
-        return self.metric(pred[self.target_class,:,:,:].unsqueeze(0), target[self.target_class,:,:,:].unsqueeze(0))
+        if pred.shape[0] != 1:
+            pred = pred[self.target_class,:,:,:].unsqueeze(0)
+
+        if target.shape[0] != 1:
+            target = target[self.target_class,:,:,:].unsqueeze(0)
+
+        return self.metric(pred, target)
 
 
 class MetricesStruct():
