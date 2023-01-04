@@ -468,6 +468,7 @@ class Options:
         with open(config_file, 'r') as infile:
             opt_dict = json.load(infile)
             if self.kwargs != None:
+                print(f'Overwriting config file with kwargs: {self.kwargs}')
                 opt_dict.update(self.kwargs)
                 
             self.opt = Namespace(**opt_dict)
