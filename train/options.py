@@ -197,6 +197,8 @@ class Options:
         self.parser.add_argument('--norm_percentile', type=float, default=99.0)
         self.parser.add_argument('--rand_rotate',choices=('True','False'), default='False')
         self.parser.add_argument('--det_val_crop',choices=('True','False'), default='False')
+        self.parser.add_argument('--val_threshold_cc',type = int, default=0)
+        self.parser.add_argument('--val_threshold_data',type = float, default=0.0)
 
         self.parser.add_argument('--model_name', type=str, default='UNet', help='name of model')
         self.parser.add_argument('--num_blocks', type=int, default=5)
@@ -223,7 +225,6 @@ class Options:
             self.opt.path_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/%s/data/'%(self.opt.dataset)
         if self.opt.path_split == "":
             self.opt.path_split = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/%s/%s'%(self.opt.dataset, self.opt.split_dict)
-            print(self.opt.path_split)
         self.opt.path_to_save_pretrained_models = os.path.join(self.opt.path_to_save_pretrained_models ,self.opt.experiment_name)
 
         if self.opt.extra_dataset != "":
@@ -304,7 +305,10 @@ class Options:
                 ], debug=False)
 
         self.opt.tf_post = transformations.ComposeTransforms([
-            transformations_post.MaskOutSidesThreshold() if self.opt.crop_sides else None
+            transformations_post.MaskOutSidesThreshold() if self.opt.crop_sides else None,
+            transformations_post.Threshold_data(self.opt.val_threshold_data) if self.opt.val_threshold_data > 0.0 else None,
+            transformations_post.Threshold_cc(self.opt.val_threshold_cc) if self.opt.val_threshold_cc > 0 else None,
+
         ], debug=False)
 
         #################### LOSS FUNCTION ####################
@@ -322,18 +326,18 @@ class Options:
         
         elif  self.opt.loss.lower() == 'mixloss':
             if self.opt.num_classes == 1:
-                self.opt.criterion_loss = MixLoss(torch.nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([self.opt.positive_weight]).to(self.opt.device)), 
-                                                monai.losses.GeneralizedDiceLoss(include_background=True, to_onehot_y=False, sigmoid=True, reduction='mean'),
+                self.opt.criterion_loss = MixLoss([torch.nn.BCEWithLogitsLoss(pos_weight=torch.Tensor([self.opt.positive_weight]).to(self.opt.device)), 
+                                                monai.losses.GeneralizedDiceLoss(include_background=True, to_onehot_y=False, sigmoid=True, reduction='mean')],
                                                 [0.5,0.5])
             elif self.opt.num_classes == 3: 
-                self.opt.criterion_loss = MixLoss(nn.CrossEntropyLoss(weight=torch.Tensor([1,self.opt.negative_weight,self.opt.positive_weight]).to(self.opt.device)), 
-                                                monai.losses.GeneralizedDiceLoss(include_background=False, to_onehot_y=False, sigmoid=True, reduction='mean'),
+                self.opt.criterion_loss = MixLoss([nn.CrossEntropyLoss(weight=torch.Tensor([1,self.opt.negative_weight,self.opt.positive_weight]).to(self.opt.device)), 
+                                                monai.losses.GeneralizedDiceLoss(include_background=False, to_onehot_y=False, sigmoid=True, reduction='mean')],
                                                 [0.5,0.5])
             elif self.opt.num_classes == 22:
                 weight_list = [1] + [self.opt.negative_weight]*(self.opt.num_classes-1)
                 weight_list[new_target_label] = self.opt.positive_weight
-                self.opt.criterion_loss = MixLoss(nn.CrossEntropyLoss(weight=torch.Tensor(weight_list).to(self.opt.device)), 
-                                monai.losses.GeneralizedDiceLoss(include_background=False, to_onehot_y=False, sigmoid=True, reduction='mean'),
+                self.opt.criterion_loss = MixLoss([nn.CrossEntropyLoss(weight=torch.Tensor(weight_list).to(self.opt.device)), 
+                                monai.losses.GeneralizedDiceLoss(include_background=False, to_onehot_y=False, sigmoid=True, reduction='mean')],
                                 [0.5,0.5])
             else:
                 raise NotImplementedError(f'Num_Classes {self.opt.num_classes} for {self.opt.loss} is not implemented')
@@ -463,6 +467,7 @@ class Options:
             opt_dict = json.load(infile)
             if self.kwargs != None:
                 opt_dict.update(self.kwargs)
+                
             self.opt = Namespace(**opt_dict)
         self.file_cont = str(self.opt)
 
@@ -477,6 +482,12 @@ class Options:
             
         if not hasattr(self.opt, 'det_val_crop'):
             self.opt.det_val_crop = False
+
+        if not hasattr(self.opt, 'val_threshold_data'):
+            self.opt.val_threshold_data = 1.0
+
+        if not hasattr(self.opt, 'val_threshold_cc'):
+            self.opt.val_threshold_cc = 100
 
     def load_from_args(self):
         self.opt = copy.deepcopy(self.inp)
