@@ -373,6 +373,8 @@ class Options:
                 "Dice": TargetLabelMetric(DiceMetric(), new_target_label),
                 "Recall": TargetLabelMetric(RecallMetric(), new_target_label),
                 "Precision": TargetLabelMetric(PrecisionMetric(), new_target_label),
+                "Hausdorff": TargetLabelMetric(HausDorffMetricMonai(percentile=99), new_target_label),
+                "VolSimilarity": TargetLabelMetric(VolumetricSimilarityMetric(), new_target_label),
                 "MDice": MultiClassDiceMetric(include_background=True) if self.opt.compute_mdice else None
                     }
 
