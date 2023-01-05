@@ -170,7 +170,22 @@ class MetricesStruct():
                 if func != None:
                     if self.debug:
                         start_time = time.time()
-                    score = func(pred[el_id,...],target[el_id,...])
+
+                    # Trying to catch C++ errors
+                    attempt = 0
+                    num_attempts = 3
+                    while attempt < num_attempts:
+                        try:
+                            score = func(pred[el_id,...],target[el_id,...])
+                        except Exception as e:
+                            attempt += 1
+                            if attempt < num_attempts:
+                                print(f"Error {e} in {name} metric. Trying again.")
+                            else:
+                                print(f"Error {e} in {name} metric. Aborting.")
+                                raise e
+                            
+
                     if self.debug:
                         print(f'Metric computing time for {name}: {round(time.time()-start_time, 4)} seconds')
                     if isinstance(score, Tensor):

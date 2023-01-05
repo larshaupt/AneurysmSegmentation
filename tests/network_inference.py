@@ -43,8 +43,8 @@ def make_predictions(
             config_overwrite:dict = None,
             postprocessing:bool = False,
             postfix = ""):
-
-    predictor = ut.Predictor(experiment_names, pre_trained_path, epoch=epoch, config_overwrite = config_overwrite, postprocessing=postprocessing)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    predictor = ut.Predictor(experiment_names, pre_trained_path, epoch=epoch, config_overwrite = config_overwrite, postprocessing=postprocessing, device=device)
     exp_config = predictor.get_exp_config(experiment_names[0])
     data_names = ut.load_split(exp_config.path_split.replace("_downscaled", "d"), exp_config.fold_id, split=split)
     if tf_mode == 'train':
@@ -58,7 +58,7 @@ def make_predictions(
     data_loader = torch.utils.data.DataLoader(ds_data, batch_size = 1, shuffle = False, num_workers = 0, pin_memory=False)
 
     if save:
-        save_path = os.path.join(save_path, predictor.get_all_exp_names() + postfix)
+        save_path = os.path.join(save_path, predictor.get_all_exp_names_comp() + postfix)
         model_pred_path_split = os.path.join(save_path, f'{split}_tf{tf_mode}')
         if gifs:
             path_to_gifs = os.path.join(model_pred_path_split, 'gifs/')
@@ -98,6 +98,7 @@ def make_predictions(
     scores = metric.get_single_score_per_name()
     print(f"Scores for {predictor.get_all_exp_names()} with {tf_mode} transform on {split} split:")
     scores_df = pd.DataFrame(data=scores).transpose()
+    scores_df.name = predictor.get_all_exp_names_comp()
     print(scores_df)
     if save:
         scores_df.to_csv(model_scores_path)
@@ -188,8 +189,12 @@ def save_pred(
 
 #%%
 #experiment_names = ['USZ_BrainArtery_bias_sweep_1672294348', 'USZ_BrainArtery_bias_sweep_1672266130']
-experiment_names= ['Adam_sweep_1672475897', 'Adam_sweep_1672501329', 'Adam_sweep_1672475897','Adam_sweep_1672488572', 'Adam_sweep_1672489120']
-experiment_names = ['USZ_BrainArtery_bias_sweep_1672373421']
+experiment_names_adam= ['Adam_sweep_1672475897', 'Adam_sweep_1672501329', 'Adam_sweep_1672475897','Adam_sweep_1672488572', 'Adam_sweep_1672489120']
+experiment_names = ['USZ_BrainArtery_bias_sweep_1672678241']
+experiment_names_best_bce = ["USZ_BrainArtery_bias_sweep_1672864585", "USZ_BrainArtery_bias_sweep_1672860029", "USZ_BrainArtery_bias_sweep_1672859412", "USZ_BrainArtery_bias_sweep_1672846254","USZ_BrainArtery_bias_sweep_1672846264" ] #best model run
+experiment_names_best_softdice = ["USZ_BrainArtery_bias_sweep_1672860983", "USZ_BrainArtery_bias_sweep_1672859830", "USZ_BrainArtery_bias_sweep_1672849038", "USZ_BrainArtery_bias_sweep_1672846264","USZ_BrainArtery_bias_sweep_1672846264" ] #best model run
+experiment_names = experiment_names_best_softdice + experiment_names_best_bce + experiment_names_adam
+
 model_name = 'best_model.pth'
 pre_trained_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained'
 save_path = '/srv/beegfs02/scratch/brain_artery/data/training/predictions/'
@@ -206,14 +211,14 @@ make_predictions(
             nifti=True, 
             split = 'test', 
             num_slices = 5, 
-            num=10 ,
+            num=-1 ,
             tf_mode='test', 
             scale_factor = (1.0, 1.0, 1.0),
-            save = False,
+            save = True,
             binarize_target = True,
             config_overwrite = None,
             postprocessing= True,
-            postfix = "no_postprocessing")
+            postfix = "_alladam")
 
 
 # %%

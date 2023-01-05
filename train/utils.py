@@ -178,9 +178,10 @@ class Predictor:
         if not exp_name in self.models.keys():
             raise ValueError(f'Experiment {exp_name} not loaded. Please load it first.')
         (model,exp_config) = self.models[exp_name]
-        model = model.to(self.device)
-        data = data.to(self.device)
-        pred = model(data)
+        with torch.no_grad():
+            model = model.to(self.device)
+            data = data.to(self.device)
+            pred = model(data)
         if exp_config.num_classes > 1:
             pred = torch.softmax(pred, dim=1)
         else:
@@ -210,9 +211,10 @@ class Predictor:
 
 
     def predict_all_combine(self,data):
-        pred = torch.zeros_like(data, dtype=torch.float32, device=self.device)
+        cpu_device = torch.device('cpu')
+        pred = torch.zeros_like(data, dtype=torch.float32, device=cpu_device)
         for exp_name in self.exp_names:
-            pred_t = self.predict(data, exp_name, postprocessing=False)
+            pred_t = self.predict(data, exp_name, postprocessing=False).to(cpu_device)
             if pred_t.shape[1] == 3:
                 pred_t = pred_t[:,2,...].unsqueeze(dim=1)
             elif pred_t.shape[1] == 22:
@@ -232,4 +234,10 @@ class Predictor:
         return self.exp_names
 
     def get_all_exp_names(self):
+        return '_'.join(self.exp_names)
+
+
+    def get_all_exp_names_comp(self):
+        if len(self.exp_names) > 2:
+            return self.exp_names[0] + '_' + self.exp_names[1] + f'_plus_{len(self.exp_names) - 2}'
         return '_'.join(self.exp_names)
