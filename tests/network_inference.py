@@ -99,7 +99,7 @@ def make_predictions(
     print(f"Scores for {predictor.get_all_exp_names()} with {tf_mode} transform on {split} split:")
     scores_df = pd.DataFrame(data=scores).transpose()
     scores_df.name = predictor.get_all_exp_names_comp()
-    print(scores_df)
+    print(scores_df.to_string())
     if save:
         scores_df.to_csv(model_scores_path)
 
@@ -216,9 +216,9 @@ make_predictions(
             scale_factor = (1.0, 1.0, 1.0),
             save = True,
             binarize_target = True,
-            config_overwrite = None,
+            config_overwrite = config_overwrite,
             postprocessing= True,
-            postfix = "_alladam")
+            postfix = "_alladam_wp")
 
 
 # %%
