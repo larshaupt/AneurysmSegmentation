@@ -216,7 +216,7 @@ class MetricesStruct():
     def _average_scores(self):
         for name, sc in self.scores.items():
             if len(sc) != 0:
-                self.average_scores[str(self.prefix)+ str(name)] = sum([el[0] for el in sc])/len(sc)
+                self.average_scores[str(self.prefix)+ str(name)] = np.nanmean([el[0] for el in sc])
             else:
                 self.average_scores[str(self.prefix)+ str(name)] = 0
 
