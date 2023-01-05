@@ -240,7 +240,7 @@ def process_file(mri_file, i, path, resample = True, voxel_size = (0.3, 0.3, 0.6
 #MRI_file_list = extract_files(path_to_data)
 MRI_file_list = extract_preprocessed_files(path_to_preprocessed_nifti, path_to_masks)
 
-save_path = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias111/data"
+save_path = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias/data"
 
 #targets = ["11096773_IB_PComm", "10919238_GD_MCA"]
 targets = []
@@ -254,16 +254,16 @@ def run_process(every_n = 4, start_i = 0):
         i, 
         save_path, 
         resample = True, 
-        voxel_size = (1.0, 1.0, 1.0) ,
+        voxel_size = (0.3, 0.3, 0.6) ,
         bias_corr = False, 
         preprocessed=True,
         save_header = False, 
-        save_as="nifti", 
+        save_as="h5", 
         overwrite=True, 
         label_mapping='',
         include_mask=False,
         skip_label=False,
-        skip_tof=True,
+        skip_tof=False,
         )
 
 ps = []

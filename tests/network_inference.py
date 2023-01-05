@@ -23,9 +23,12 @@ import numpy as np
 
 #%%
 
+
+
 def make_predictions(
-            model_weights_path, 
-            exp_config_path, 
+            experiment_names,
+            pre_trained_path,
+            epoch = 'best_model.pth',
             save_path = None, 
             img = True,  
             gifs = False, 
@@ -33,14 +36,16 @@ def make_predictions(
             split = 'test', 
             num = -1,
             num_slices = 5, 
-            tf_mode='test',
+            tf_mode='val',
             scale_factor = (1.0,1.0,1.0),
             save = True,
-            binarize_target = True):
+            binarize_target = True,
+            config_overwrite:dict = None,
+            postprocessing:bool = False,
+            postfix = ""):
 
-    
-    exp_config = ut.load_config(exp_config_path)
-    model = ut.load_model(exp_config, model_weights_path)
+    predictor = ut.Predictor(experiment_names, pre_trained_path, epoch=epoch, config_overwrite = config_overwrite, postprocessing=postprocessing)
+    exp_config = predictor.get_exp_config(experiment_names[0])
     data_names = ut.load_split(exp_config.path_split.replace("_downscaled", "d"), exp_config.fold_id, split=split)
     if tf_mode == 'train':
         tf = exp_config.tf_train
@@ -53,6 +58,7 @@ def make_predictions(
     data_loader = torch.utils.data.DataLoader(ds_data, batch_size = 1, shuffle = False, num_workers = 0, pin_memory=False)
 
     if save:
+        save_path = os.path.join(save_path, predictor.get_all_exp_names() + postfix)
         model_pred_path_split = os.path.join(save_path, f'{split}_tf{tf_mode}')
         if gifs:
             path_to_gifs = os.path.join(model_pred_path_split, 'gifs/')
@@ -73,15 +79,10 @@ def make_predictions(
         if i >= num and num!=-1:
             break
         
-        pred = model(data)
+        pred = predictor.predict_all_combine(data)
 
-        if exp_config.num_classes > 1:
-            pred = torch.softmax(pred, dim=1)
-        else:
-            pred = torch.sigmoid(pred)
-
-        
         metric.update(pred, target, el_name=name[0])
+        print(metric.get_last_scores())
         if save:
             save_pred(data, target, 
                 norm_params, 
@@ -95,7 +96,7 @@ def make_predictions(
                 target_label=exp_config.target_label)
 
     scores = metric.get_single_score_per_name()
-    print(f"Scores for {experiment_name} with {tf_mode} transform on {split} split:")
+    print(f"Scores for {predictor.get_all_exp_names()} with {tf_mode} transform on {split} split:")
     scores_df = pd.DataFrame(data=scores).transpose()
     print(scores_df)
     if save:
@@ -186,26 +187,33 @@ def save_pred(
 
 
 #%%
-experiment_name = 'USZ_BrainArtery_bias_sweep_1672252497'
-epoch = 290
-model_name = 'model_%i.pth'%(epoch)
+#experiment_names = ['USZ_BrainArtery_bias_sweep_1672294348', 'USZ_BrainArtery_bias_sweep_1672266130']
+experiment_names= ['Adam_sweep_1672475897', 'Adam_sweep_1672501329', 'Adam_sweep_1672475897','Adam_sweep_1672488572', 'Adam_sweep_1672489120']
+experiment_names = ['USZ_BrainArtery_bias_sweep_1672373421']
 model_name = 'best_model.pth'
-config_file = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/%s.json' %(experiment_name, experiment_name)       
-model_weight_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/%s/4/' %(experiment_name) + model_name
-save_path = '/srv/beegfs02/scratch/brain_artery/data/training/predictions/%s/' %(experiment_name)
-make_predictions(model_weight_path, 
-            config_file, 
+pre_trained_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained'
+save_path = '/srv/beegfs02/scratch/brain_artery/data/training/predictions/'
+
+config_overwrite = {'val_threshold_cc' : 100, 'val_threshold_data': 1.0}
+# %%
+make_predictions( 
+            experiment_names,
+            pre_trained_path, 
+            epoch = model_name,
             save_path = save_path, 
             img=True,  
             gifs = False, 
             nifti=True, 
-            split = 'val', 
+            split = 'test', 
             num_slices = 5, 
             num=10 ,
-            tf_mode='val', 
+            tf_mode='test', 
             scale_factor = (1.0, 1.0, 1.0),
-            save = True,
-            binarize_target = True)
+            save = False,
+            binarize_target = True,
+            config_overwrite = None,
+            postprocessing= True,
+            postfix = "no_postprocessing")
 
 
 # %%

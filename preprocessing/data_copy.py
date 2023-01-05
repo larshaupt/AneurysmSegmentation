@@ -203,7 +203,7 @@ def copy_labels_and_images(path, label_dir, image_dir, name_base, overwrite=Fals
 
         image_source_path = os.path.join(file_path, image_name)
         image_save_path = os.path.join(image_dir, save_name_image)
-        print(image_source_path, image_save_path)
+        print(image_name, save_name_image)
         # Get affine of image
         img = nib.load(image_source_path)
         affine_new = img.affine.copy()
@@ -224,6 +224,7 @@ def copy_labels_and_images(path, label_dir, image_dir, name_base, overwrite=Fals
         mapping_path = os.path.join(file_path, 'label_assignment.csv')
         label_source_path = os.path.join(file_path, image_name)
         label_save_path = os.path.join(label_dir, save_name_label)
+        print(image_name, save_name_label)
         if not os.path.exists(label_save_path) or overwrite:
             transform_labels_nifti(label_source_path, label_save_path, mapping_path, affine_new, binarize_target = 4)
 
@@ -242,9 +243,9 @@ def transform_labels_nifti(source, target, mapping_path, affine, binarize_target
     nib.save(nii_corr, target)
 
 path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_new'
-label_dir = '/srv/beegfs02/scratch/brain_artery/data/nnUNET/nnUNet_raw_data_base/nnUNet_raw_data/Task544_BrainArtery/labelsTr'
-image_dir = '/srv/beegfs02/scratch/brain_artery/data/nnUNET/nnUNet_raw_data_base/nnUNet_raw_data/Task544_BrainArtery/imagesTr'
+label_dir = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/nnUNet_raw_data_base/nnUNet_raw_data/Task544_BrainArtery/labelsTr'
+image_dir = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/nnUNet_raw_data_base/nnUNet_raw_data/Task544_BrainArtery/imagesTr'
 name_base = 'BrainArtery'
-copy_labels_and_images(path, label_dir, image_dir, name_base, overwrite=False)
+copy_labels_and_images(path, label_dir, image_dir, name_base, overwrite=True)
 
 

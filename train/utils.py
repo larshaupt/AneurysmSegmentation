@@ -46,7 +46,7 @@ def load_split(path_dict:str, fold_id:int, split:str = "") -> dict|list:
     return fold_dict
 
 
-def binarize(pred, threshold=0.5):
+def binarize(pred, threshold=0.5, one_hot=False):
     if not isinstance(pred, Tensor):
         pred = Tensor(pred)
     
@@ -58,15 +58,19 @@ def binarize(pred, threshold=0.5):
 
     while len(pred.shape) < 5:
         pred = torch.unsqueeze(Tensor(pred), dim=0)
-
+    # reduce everything to 4 dimensions
     batch_slices = []
     for pred_slice in pred:
-        if pred_slice.shape[0] == 1: # one channel
+        num_channels = pred_slice.shape[0]
+        if num_channels == 1: # one channel
             pred_slice = pred_slice > threshold
-        elif pred_slice.shape[0] == 2: # two channels
+        elif num_channels == 2: # two channels
             pred_slice = torch.unsqueeze(torch.where(pred_slice[0,...] > pred_slice[1,...], 1,0), dim=0)
         else: # more than two channels
-            pred_slice = torch.unsqueeze(torch.argmax(pred_slice, dim=0), dim=0)
+            if not one_hot:
+                pred_slice = torch.unsqueeze(torch.argmax(pred_slice, dim=0), dim=0)
+            else:
+                pred_slice = torch.nn.functional.one_hot(torch.argmax(pred_slice, dim=0), num_classes=num_channels).view(num_channels, *pred_slice.shape[1:])
         batch_slices.append(pred_slice)
     pred = torch.stack(batch_slices, dim=0)
 
@@ -120,8 +124,11 @@ def load_exp_config(exp_config_path):
 
     return exp_config
 
-def load_config(config_path, verbose=False):
-    op = Options(config_file = config_path, verbose=verbose)
+def load_config(config_path, verbose=False, overwrite=None):
+    if overwrite != None:
+        op = Options(config_file = config_path, verbose=verbose, **overwrite)
+    else:
+        op = Options(config_file = config_path, verbose=verbose)
     return op.opt
 
 
@@ -135,3 +142,94 @@ def load_model(exp_config, model_weights_path):
     model.eval()
 
     return model
+
+
+
+class Predictor:
+    def __init__(self, exp_names:list, pre_trained_path:str , epoch = 'best_model.pth', device = 'cpu', config_overwrite:dict=None, postprocessing=False, verbose=False) -> None:
+        self.exp_names = exp_names
+        self.pre_trained_path = pre_trained_path
+        self.epoch = epoch
+        self.models = {}
+        self.device = device
+        self.config_overwrite = config_overwrite
+        self.postprocessing = postprocessing
+        self.verbose = verbose
+        
+
+        for exp_name in self.exp_names:
+            self.load_model(exp_name)
+        self.standard_exp_config = self.models[self.exp_names[0]][1]
+
+    def load_model(self, exp_name):
+        exp_config_path = os.path.join(self.pre_trained_path, exp_name, f'{exp_name}.json')
+        exp_config = load_config(exp_config_path, verbose=self.verbose, overwrite = self.config_overwrite)
+        fold_id = exp_config.fold_id
+        model_weights_path = os.path.join(self.pre_trained_path,exp_name,  str(fold_id), self.epoch)
+        try:
+            model = load_model(exp_config, model_weights_path)
+            self.models[exp_name] = (model, exp_config)
+
+        except Exception as e:
+            print(f'Could not load model for experiment {exp_name}.')
+            print(e)
+
+    def predict(self, data, exp_name, postprocessing=False):
+        if not exp_name in self.models.keys():
+            raise ValueError(f'Experiment {exp_name} not loaded. Please load it first.')
+        (model,exp_config) = self.models[exp_name]
+        model = model.to(self.device)
+        data = data.to(self.device)
+        pred = model(data)
+        if exp_config.num_classes > 1:
+            pred = torch.softmax(pred, dim=1)
+        else:
+            pred = torch.sigmoid(pred)
+
+        if postprocessing:
+            pred = self.postprocess(pred, data, exp_config)
+        
+        return pred
+
+    def predict_all(self, data):
+        preds = {}
+        for exp_name in self.exp_names:
+            preds[exp_name] = self.predict(data, exp_name, postprocessing=False)
+
+
+    def postprocess(self, pred, data , exp_config):
+        if hasattr(exp_config, "tf_post"):
+            pred = pred > 0.5
+            pred = binarize(pred, one_hot=True)
+            sample = {'image': data.squeeze(0), 'target': pred.squeeze(0)}
+            sample = exp_config.tf_post(sample)
+            pred = sample['target'].unsqueeze(0)
+            return pred
+        raise NotImplementedError('Cannot find postprocessing function.')
+            
+
+
+    def predict_all_combine(self,data):
+        pred = torch.zeros_like(data, dtype=torch.float32, device=self.device)
+        for exp_name in self.exp_names:
+            pred_t = self.predict(data, exp_name, postprocessing=False)
+            if pred_t.shape[1] == 3:
+                pred_t = pred_t[:,2,...].unsqueeze(dim=1)
+            elif pred_t.shape[1] == 22:
+                pred_t = pred_t[:,4,...].unsqueeze(dim=1)
+            pred += pred_t
+
+        if self.postprocessing:
+            pred = self.postprocess(pred, data, self.standard_exp_config)
+        return pred
+
+    def get_exp_config(self, exp_name):
+        if not exp_name in self.models.keys():
+            raise ValueError(f'Experiment {exp_name} not loaded. Please load it first.')
+        return self.models[exp_name][1]
+
+    def get_exp_names(self):
+        return self.exp_names
+
+    def get_all_exp_names(self):
+        return '_'.join(self.exp_names)

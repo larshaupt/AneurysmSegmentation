@@ -71,7 +71,7 @@ def compute_new_dim(old_dims, old_vox, new_vox):
         new_dim[i] = int(od * (ov/nv))
     return new_dim
 
-def process_file(mri_file, i, ):
+def process_file(mri_file, i, skip_tof=False):
     
     print(f"Processing {i} out of {len(MRI_file_list)}: {mri_file['name']}")
 
@@ -90,23 +90,22 @@ def process_file(mri_file, i, ):
     nii_x_img = nib.load(tof[0])
 
     x_affine = nii_x_img.affine.copy()
+    if not skip_tof:
+        #nii_x_data_bias, _ = correct_bias(nii_x_img.get_fdata())
+        nii_x_data_bias = nii_x_img.get_fdata()
 
-    #nii_x_data_bias, _ = correct_bias(nii_x_img.get_fdata())
-    nii_x_data_bias = nii_x_img.get_fdata()
+        nii_x_img = nib.Nifti1Image(nii_x_data_bias, nii_x_img.affine, nii_x_img.header)
 
-    nii_x_img = nib.Nifti1Image(nii_x_data_bias, nii_x_img.affine, nii_x_img.header)
+        # preprocessing data
+        new_x_dim = compute_new_dim(nii_x_img.header["dim"][1:4], nii_x_img.header["pixdim"][1:4], voxel_size)
+        nii_x_img = conform(nii_x_img, voxel_size = voxel_size, out_shape = new_x_dim, order = 3, cval=0)
+        #nii_x_img = conform(nii_x_img, out_shape=out_shape, voxel_size=voxel_size, order=3, cval=0, orientation='RAS')
+        json_object = pd.Series(nii_x_img.header).to_json()
+        with open(os.path.join(path_to_exterinal_header, mri_file['name'] + '.json'), 'w') as f:
+            f.write(json_object)
 
-    # preprocessing data
-    new_x_dim = compute_new_dim(nii_x_img.header["dim"][1:4], nii_x_img.header["pixdim"][1:4], voxel_size)
-    nii_x_img = conform(nii_x_img, voxel_size = voxel_size, out_shape = new_x_dim, order = 3, cval=0)
-    #nii_x_img = conform(nii_x_img, out_shape=out_shape, voxel_size=voxel_size, order=3, cval=0, orientation='RAS')
-    json_object = pd.Series(nii_x_img.header).to_json()
-    with open(os.path.join(path_to_exterinal_header, mri_file['name'] + '.json'), 'w') as f:
-        f.write(json_object)
-
-
-    with h5py.File(path_to_saved_x_file + ".h5", 'w') as f:
-        f.create_dataset('data', data=nii_x_img.get_fdata()) 
+        with h5py.File(path_to_saved_x_file + ".h5", 'w') as f:
+            f.create_dataset('data', data=nii_x_img.get_fdata()) 
 
     # Process Segmentation label file (Y)
     seg = []
@@ -139,7 +138,7 @@ def process_file(mri_file, i, ):
     # print mapping
     #label_mapping[['id_in_file', 'class_id']].dropna(axis='index', how='any').set_index('id_in_file').to_dict()['class_id']
 
-    nii_y_data = nii_y_img.get_fdata().astype('uint8')
+    nii_y_data = nii_y_img.get_fdata().astype('float64')
     label_mapping = {1:4}
     nii_y_data_corr = map_labels(nii_y_data, label_mapping)
 
@@ -148,7 +147,7 @@ def process_file(mri_file, i, ):
 
 def run_process(every_n = 4, start_i = 0):
     for i in range(start_i, len(MRI_file_list), every_n):
-        process_file(MRI_file_list[i], i)
+        process_file(MRI_file_list[i], i, skip_tof = True)
 ps = []
 n = 8
 for k in range(n):

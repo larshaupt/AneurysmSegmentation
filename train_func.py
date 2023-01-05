@@ -181,12 +181,14 @@ def train_segmentation_network(
     print(exp_cont)
     print(f'Training on {device}')
 
-    if exp_config.lr_scheduler == 'reduce':
+    if exp_config.lr_scheduler.lower() == 'reduce':
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=int(exp_config.patience/2), threshold=1e-5, verbose=True)
-    elif exp_config.lr_scheduler == 'cycle':
+    elif exp_config.lr_scheduler.lower() == 'cycle':
         scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.01, steps_per_epoch=len(loader_train), epochs=exp_config.number_of_epoch, verbose=True)
-    elif exp_config.lr_scheduler == 'step':
+    elif exp_config.lr_scheduler.lower() == 'step':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=int(exp_config.patience * 0.8), gamma=0.1, verbose=True)
+    elif exp_config.lr_scheduler.lower() == 'polynomial':
+        scheduler = torch.optim.lr_scheduler.PolynomialLR(optimizer,total_iters = exp_config.number_of_epoch, power=0.9, verbose=True)
     else:
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lr_lambda = lambda x:exp_config.lambda_loss, verbose=True)
     if exp_config.early_stopping:

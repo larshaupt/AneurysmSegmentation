@@ -242,7 +242,7 @@ class Options:
         if self.opt.sweep:
             self.opt.name = self.opt.name + '_' + os.environ['SLURM_ARRAY_TASK_ID']
 
-        if self.opt.pretrained_weights_dict != "":
+        if self.opt.pretrained_weights_dict != "" and self.opt.pretrained_weights_dict != None :
             weights_dict = pd.read_csv(self.opt.pretrained_weights_dict)
             weights_name = weights_dict.iloc[self.opt.fold_id]['name']
             ind = weights_name[::-1].find('_')
@@ -506,5 +506,7 @@ class Options:
         if not hasattr(self.opt, 'val_threshold_cc'):
             self.opt.val_threshold_cc = 100
 
+        if not hasattr(self.opt, 'pretrained_weights_dict'):
+            self.opt.pretrained_weights_dict = ""
     def load_from_args(self):
         self.opt = copy.deepcopy(self.inp)
