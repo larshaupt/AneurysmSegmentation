@@ -223,7 +223,7 @@ def train_segmentation_network(
         log_dict.update(train_metrics.get_scores())
         logger.log(log_dict=log_dict, epoch = epoch, verbose=True)
 
-        if exp_config.lr_scheduler in  ['reduce', 'cycle']:
+        if exp_config.lr_scheduler in  ['reduce', 'cycle', 'step', 'polynomial']:
             scheduler.step(running_loss_val_total)
         else:
             scheduler.step()

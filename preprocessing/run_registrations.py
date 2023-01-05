@@ -30,9 +30,14 @@ x_files = sorted(x_files)
 
 
 
-def compute_registration(x_name, save_path, template_data, template_affine, data_path, save_plot=True):
+def compute_registration(x_name, save_path, template_data, template_affine, data_path, save_plot=True, overwrite=False):
 
     print(x_name)
+
+    if os.path.exists(os.path.join(save_path, x_name[:-9] + '_affine.npy')) and not overwrite:
+        print('Already computed')
+        return
+        
     img_path = os.path.join(data_path, x_name)
 
     image = nib.load(img_path)
@@ -53,7 +58,7 @@ def compute_registration(x_name, save_path, template_data, template_affine, data
 
     xformed_img, reg_affine = affine_registration(
         moving_data,
-        template_data,
+        static_data,
         moving_affine=moving_affine,
         static_affine=static_affine,
         nbins=32,
@@ -63,12 +68,11 @@ def compute_registration(x_name, save_path, template_data, template_affine, data
         sigmas=sigmas,
         factors=factors)
 
-    np.save(os.path.join(save_path, x_name[:-9] + '_affine.npy'), reg_affine.affine)
-    with open(os.path.join(save_path, x_name[:-9] + '_affine.pickle'), 'wb') as handle:
-        pickle.dump(reg_affine, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    np.save(os.path.join(save_path, x_name[:-9] + '_affine.npy'), reg_affine)
     
+    affine_transform = AffineMap(reg_affine,template_data.shape, template_affine,moving_data.shape, moving_affine)
+    transformed = affine_transform.transform(moving_data)
 
-    transformed = reg_affine.transform(moving_data)
     if save_plot:
         regtools.overlay_slices(template_data, transformed, None, 0,"Template", "Moving", fname=os.path.join(save_path, x_name[:-9] + '_overlay0.png'))
         regtools.overlay_slices(template_data, transformed, None, 1,"Template", "Moving", fname=os.path.join(save_path, x_name[:-9] + '_overlay1.png'))
@@ -82,7 +86,7 @@ def run_process(every_n = 4, start_i = 0):
         compute_registration(x_files[i], save_path, template_data, template_affine, data_path, save_plot=True)
 
 ps = []
-n = 1
+n = 2
 split_dif = n
 split_id = 0
 for k in range(split_id*split_dif, split_dif*(split_id+1)):
