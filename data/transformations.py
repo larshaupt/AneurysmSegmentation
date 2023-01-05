@@ -831,19 +831,6 @@ def test_transform(trans):
 #ret = test_transform(OneHotEncodeLabel(14))
 
 # %%
-img = torch.zeros(40,40,40)
-img[10:-10,10:-10,10:-10]=  torch.rand(20,20,20)
-target = torch.zeros(40,40,40)
-target[10:-10,10:-10,10:-10]=  target = torch.rand(20,20,20) < 0.001
-
-
-def select_fn(img):
-    return img[0] > 0.0
-crop = transforms.CropForegroundd(keys = ['image', 'target'], select_fn=select_fn, source_key='target')
-#comb = torch.cat([img, target], dim=0).detach().numpy()
-comb = {"image":img, "target":target}
-
-ret = crop(comb)
 
 # %%
 # %%
