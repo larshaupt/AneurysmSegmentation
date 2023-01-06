@@ -177,6 +177,7 @@ class MetricesStruct():
                     while attempt < num_attempts:
                         try:
                             score = func(pred[el_id,...],target[el_id,...])
+                            break
                         except Exception as e:
                             attempt += 1
                             if attempt < num_attempts:
