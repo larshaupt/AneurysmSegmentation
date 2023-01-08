@@ -197,10 +197,14 @@ class Options:
         self.parser.add_argument('--rand_affine',choices=('True','False'), default='True')
         self.parser.add_argument('--norm_percentile', type=float, default=99.0)
         self.parser.add_argument('--rand_rotate',choices=('True','False'), default='False')
+
+
         self.parser.add_argument('--det_val_crop',choices=('True','False'), default='False')
         self.parser.add_argument('--margin_crop', type=int, default=32)
         self.parser.add_argument('--val_threshold_cc',type = int, default=0)
+        self.parser.add_argument('--val_threshold_cc_max',type = int, default=0)
         self.parser.add_argument('--val_threshold_data',type = float, default=0.0)
+        self.parser.add_argument('--apply_mask',choices=('True','False'), default='False')
 
         self.parser.add_argument('--model_name', type=str, default='UNet', help='name of model')
         self.parser.add_argument('--num_blocks', type=int, default=5)
@@ -212,7 +216,7 @@ class Options:
 
     def interpret_params(self):
 
-        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate", "neighboring_vessels", "det_val_crop"]:
+        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate", "neighboring_vessels", "det_val_crop", "apply_mask"]:
             if hasattr(self.opt, el):
                 if isinstance(vars(self.opt)[el], str):
                     vars(self.opt)[el] = eval(vars(self.opt)[el])
@@ -320,8 +324,9 @@ class Options:
 
         self.opt.tf_post = transformations.ComposeTransforms([
             transformations_post.MaskOutSidesThreshold() if self.opt.crop_sides else None,
+            transformations_post.Mask_Concentation(threshold=0.01) if self.opt.apply_mask else None,
             transformations_post.Threshold_data(self.opt.val_threshold_data) if self.opt.val_threshold_data > 0.0 else None,
-            transformations_post.Threshold_cc(self.opt.val_threshold_cc) if self.opt.val_threshold_cc > 0 else None,
+            transformations_post.Threshold_cc(self.opt.val_threshold_cc, self.opt.val_threshold_cc_max) if self.opt.val_threshold_cc > 0 else None,
 
         ], debug=False)
 
@@ -370,6 +375,9 @@ class Options:
                 self.opt.criterion_loss = monai.losses.GeneralizedDiceLoss(include_background=True, to_onehot_y=False, sigmoid=True, reduction='mean')
             else: #self.opt.num_classes >= 1:
                 self.opt.criterion_loss = monai.losses.GeneralizedDiceLoss(include_background=False, to_onehot_y=False, sigmoid=True, reduction='mean')
+        elif self.opt.loss.lower() == 'comboloss':
+            self.opt.criterion_loss = ComboLoss()
+        
         else: 
             raise NotImplementedError(f'Loss {self.opt.loss} is not implemented')
 
@@ -508,5 +516,9 @@ class Options:
 
         if not hasattr(self.opt, 'pretrained_weights_dict'):
             self.opt.pretrained_weights_dict = ""
+
+        if not hasattr(self.opt, 'apply_mask'):
+            self.opt.apply_mask = False
+            
     def load_from_args(self):
         self.opt = copy.deepcopy(self.inp)

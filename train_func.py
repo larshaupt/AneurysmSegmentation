@@ -46,7 +46,6 @@ def _train(exp_config, model, loader_train, epoch, device, optimizer, criterion_
             else:
                 pred = torch.sigmoid(pred_logits)
             del pred_logits #for memory saving
-
             train_metrics.update(pred, target)
             #timer.take_time('Update Network')
             loss_train.backward()
@@ -123,7 +122,7 @@ def _validate(exp_config, model, loader_val, epoch, device, val_loss, logger):
                 
                 
                 if hasattr(exp_config, "tf_post"):
-                    sample = {'image': data.squeeze(0), 'target': pred.squeeze(0)}
+                    sample = {'image': data.squeeze(0), 'pred': pred.squeeze(0), 'mask': mask.squeeze(0)}
                     sample = exp_config.tf_post(sample)
                     pred = sample['target'].unsqueeze(0)
 

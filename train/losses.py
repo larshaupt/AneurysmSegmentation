@@ -11,6 +11,32 @@ import pdb
 
 #%%
 
+class ComboLoss(nn.Module):
+
+    def __init__(self, ce_w = 0.5, ce_d_w = 0.5, epsilon=1e-7, smooth=1) -> None:
+        super().__init__()
+        self.ce_w = ce_w
+        self.ce_d_w = ce_d_w
+        self.epsilon = epsilon
+        self.smooth = smooth
+
+
+    '''
+    ce_w values smaller than 0.5 penalize false positives more while values larger than 0.5 penalize false negatives more
+    ce_d_w is level of contribution of the cross-entropy loss in the total loss.
+    '''
+
+    def __call__(self, y_true, y_pred):
+        y_true_f = torch.flatten(y_true)
+        y_pred_f = torch.flatten(y_pred)
+        intersection = torch.sum(y_true_f * y_pred_f)
+        d = (2. * intersection + self.smooth) / (torch.sum(y_true_f) + torch.sum(y_pred_f) + self.smooth)
+        y_pred_f = torch.clip(y_pred_f, self.epsilon, 1.0 - self.epsilon)
+        out = - (self.ce_w * y_true_f * torch.log(y_pred_f)) + ((1 - self.ce_w) * (1.0 - y_true_f) * torch.log(1.0 - y_pred_f))
+        weighted_ce = torch.mean(out, axis=-1)
+        combo = (self.ce_d_w * weighted_ce) - ((1 - self.ce_d_w) * d)
+        return combo
+
 
 class WeightedBCELoss(nn.Module):
 
