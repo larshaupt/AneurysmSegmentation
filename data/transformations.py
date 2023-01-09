@@ -36,6 +36,7 @@ class ToTensor(object):
         sample['target'] = target
 
         if "mask" in sample.keys():
+            mask = sample['mask']
             mask = np.array(mask)
             mask = torch.from_numpy(mask)
             mask = mask.to(self.device)
