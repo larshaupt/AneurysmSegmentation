@@ -31,7 +31,8 @@ class MultiClassDiceMetric():
 
         assert pred.ndim == 4 and target.ndim==4
         pred, target = (convert_to_tensor(pred)).to('cpu'), (convert_to_tensor(target)).to('cpu')
-        pred, target = torch.softmax(pred, dim=0), torch.softmax(target, dim=0)
+
+        #pred, target = torch.softmax(pred, dim=0), torch.softmax(target, dim=0)
         pred = torch.nn.functional.one_hot(torch.argmax(pred, dim=0), pred.shape[0]).movedim(3,0) # binarizes the prediction tensor
         return self.metric(pred.view(1, *pred.shape), target.view(1, *target.shape)).item() # need to add extra dimension for function to accept it
 
@@ -257,11 +258,17 @@ class HausDorffMetricMonai():
 
 
 class HausDorffMetric():
-    def __init__(self, percentile=95) -> None:
+    def __init__(self, percentile=95, voxel_size = (0.3,0.3, 0.6)) -> None:
         self.percentile = percentile
+        self.voxel_size = voxel_size
     def __call__(self, pred: Tensor, target: Tensor):
         #result_statistics = sitk.StatisticsImageFilter()
         #result_statistics.Execute(result_image)
+
+        pred, target = convert_to_tensor(pred), convert_to_tensor(target)
+        assert pred.shape[0] == 1 and target.shape[0] == 1 
+        pred, target = ut.binarize(pred), ut.binarize(target)
+
         pred = pred.detach().numpy()
         target = target.detach().numpy()
         pred_sum = np.sum(pred)
@@ -281,14 +288,17 @@ class HausDorffMetric():
         h_pred = pred- e_pred
 
 
-        h_target_indices = np.argwhere(h_target)
-        h_pred_indices = np.argwhere(h_pred)
+        h_target_indices = np.argwhere(h_target)[:,-3:]
+        h_pred_indices = np.argwhere(h_pred)[:,-3:]
 
         #h_test_indices = np.flip(np.argwhere(sitk.GetArrayFromImage(h_test_image))).tolist()
         #h_result_indices = np.flip(np.argwhere(sitk.GetArrayFromImage(h_result_image))).tolist()
 
-        target_coordinates = h_target_indices
-        pred_coordinates = h_pred_indices
+        target_coordinates = np.multiply(h_target_indices, self.voxel_size)
+        pred_coordinates = np.multiply(h_pred_indices, self.voxel_size)
+
+        #target_coordinates = h_target_indices
+        #pred_coordinates = h_pred_indices
         #test_coordinates = [test_image.TransformIndexToPhysicalPoint(x) for x in h_test_indices]
         #result_coordinates = [test_image.TransformIndexToPhysicalPoint(x) for x in h_result_indices]
         
@@ -298,7 +308,9 @@ class HausDorffMetric():
 
         d_test_to_result = get_distances_from_a_to_b(target_coordinates, pred_coordinates)
         d_result_to_test = get_distances_from_a_to_b(pred_coordinates, target_coordinates)
-
+        if d_result_to_test.size == 0 or d_test_to_result.size == 0:
+            hd = torch.nan
+            return hd
         hd = max(np.percentile(d_test_to_result, self.percentile), np.percentile(d_result_to_test, self.percentile))
         
         return hd

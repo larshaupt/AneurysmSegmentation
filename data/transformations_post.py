@@ -1,7 +1,17 @@
 import torch
 import numpy as np
 import cc3d
+import train.utils as ut
 
+class Binarize(object):
+    def __init__(self, threshold = 0.5) -> None:
+        self.threshold = threshold
+
+    def __call__(self, sample:dict) -> dict:
+        pred = sample['pred']
+        pred = ut.binarize(pred, threshold = self.threshold)
+        sample["pred"] = pred
+        return sample
 
 
 class MaskOutSidesThreshold(object):
@@ -9,11 +19,15 @@ class MaskOutSidesThreshold(object):
         self.smooth = smooth
 
     def __call__(self, sample:dict) -> dict:
-        image, target = sample['image'], sample['target']
+        image, pred, mask = sample['image'], sample['pred'], sample['mask']
         crop_borders = crop_till_threshold(image, threshold = 1.0, smooth = self.smooth)
         image = mask_out(image, crop_borders)
-        target = mask_out(target, crop_borders)
-        return {'image': image, 'target': target}
+        pred = mask_out(pred, crop_borders)
+        mask = mask_out(mask, crop_borders)
+        sample["image"] = image
+        sample["pred"] = pred
+        sample["mask"] = mask
+        return sample
 
 def crop(img, crop_borders):
     assert img.ndim == 3 or img.ndim == 4
@@ -80,7 +94,14 @@ def crop_till_threshold(img, threshold, axes:list = ["x", "y", "z"], smooth = 1)
     return threshold_locs
 
 
-def remove_small_components(labels, thr=100):
+def remove_small_components(labels, thr=100, thr_upper=0):
+
+            
+    if labels.shape[0] == 3:
+        labels = labels[2,:,:,:].unsqueeze(0)
+    elif labels.shape[0] == 22:
+        labels = labels[4,:,:,:].unsqueeze(0)
+
     orig_shape = labels.shape
     if isinstance(labels, torch.Tensor):
         torch_flag = True
@@ -93,41 +114,75 @@ def remove_small_components(labels, thr=100):
     orig_dtype = labels.dtype
 
     labels = np.reshape(labels, labels.shape[-3:])
+
+    
     labels_in = cc3d.connected_components(labels.astype(int), connectivity=26, return_N=False)
     
     stat = cc3d.statistics(labels_in)
     cc_size = stat['voxel_counts']
 
-    vals_to_keep = np.squeeze(np.argwhere(cc_size > thr))
+    
+    if thr_upper is not None and thr_upper > thr:
+        vals_to_keep = np.argwhere((cc_size > thr) & (cc_size < thr_upper)).flatten()
+    else:
+        vals_to_keep = np.argwhere(cc_size > thr).flatten()
 
     inds = labels_in == vals_to_keep[:, None, None, None]
     labels[~np.any(inds, axis = 0)] = 0
 
+    
 
     labels = np.reshape(labels, orig_shape)
     labels = labels.astype(orig_dtype)
-
+    
     if torch_flag:
         labels = torch.from_numpy(labels)
 
-    return labels
+    return labels > 0
 
 
 class Threshold_cc(object):
-    def __init__(self, threshold:int = 100) -> None:
+    def __init__(self, threshold:int = 100, threshold_upper = 0, thredhold_pred = 0.5) -> None:
         self.threshold = threshold
+        self.thredhold_pred = thredhold_pred
+        self.threshold_upper = threshold_upper
 
     def __call__(self, sample:dict) -> dict:
-        image, target = sample['image'], sample['target']
-        self.target = remove_small_components(target, thr=self.threshold)
-        return {'image': image, 'target': target}
+        image, pred = sample['image'], sample['pred']
+
+
+        thr_mask = remove_small_components(ut.binarize(pred) ,thr_upper = self.threshold_upper, thr=self.threshold)
+        pred = pred * thr_mask
+        sample["image"] = image
+        sample["pred"] = pred
+        return sample
 
 class Threshold_data(object):
     def __init__(self, threshold:float = 1.0) -> None:
         self.threshold = threshold
 
     def __call__(self, sample:dict) -> dict:
-        image, target = sample['image'], sample['target']
+        image, pred = sample['image'], sample['pred']
         mask = image > self.threshold
-        image = image * mask
-        return {'image': image, 'target': target}
+        pred = pred * mask
+        sample["image"] = image
+        sample["pred"] = pred
+        return sample
+
+
+class Mask_Concentation(object):
+    def __init__(self, threshold:float = 1.0) -> None:
+        self.threshold = threshold
+
+    def __call__(self, sample:dict) -> dict:
+        if 'mask' not in sample.keys():
+            print("No mask found in sample")
+            return sample
+        image, pred, mask = sample['image'], sample['pred'], sample['mask']
+        
+        mask_th = (mask/torch.max(mask)) > self.threshold
+        pred = pred * mask_th
+
+        sample["image"] = image
+        sample["pred"] = pred
+        return sample

@@ -23,7 +23,8 @@ import os
 # %%
 name = 'USZ_BrainArtery_bias_sweep_1672846264'
 file_path = f'/srv/beegfs02/scratch/brain_artery/data/training/pre_trained/{name}/{name}.json'
-options = Options(config_file=file_path)
+config_overwrite = {'apply_mask': True}
+options = Options(config_file=file_path, **config_overwrite)
 exp_config = options.get_opt() # exp_config stores configurations in the given config file under experiments folder.
 
 #%%
@@ -53,20 +54,24 @@ source_loader = data_loader.get_single_data_loader_hdf53d(
                     exp_config, 
                     1, 
                     exp_config.path_data, 
-                    tf = exp_config.tf_val, 
-                    data_names = split_dict['val'], 
+                    tf = exp_config.tf_test, 
+                    data_names = split_dict['test'], 
                     reduce_number = -1, 
-                    num_workers = 0)
+                    num_workers = 0,
+                    include_mask=True)
 source_iter = iter(source_loader)
 # %%
 data, target, mask, norm_params, names = next(source_iter)
 print(names)
 #integrate_intensity(data)
+# %%
+
 index = data.shape[-1]//2
 plt.figure()
 plt.imshow(data[0,0,:,:,index], cmap='gray')
-plt.imshow(target[0,0,:,:,index], cmap='jet',alpha=0.5)
-plt.savefig('test.png')
+plt.imshow(target[0,0,:,:,index] == 4, cmap='jet',alpha=0.5)
+plt.imshow(mask[0,0,:,:,index], cmap='jet',alpha=0.5)
+#plt.savefig('test.png')
 
 # %%
 def plot_files(source_iter, save_path = "/scratch/lhauptmann/segmentation_3D/data_analysis/loader_files"):

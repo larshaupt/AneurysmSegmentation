@@ -8,6 +8,7 @@ import pandas as pd
 import pdb
 import h5py
 import time
+import torch
 
 class HDF5Dataset3D(data.Dataset):
     """
@@ -15,13 +16,14 @@ class HDF5Dataset3D(data.Dataset):
         path: Path to the folder containing the dataset (multiple npy files).
         transform: PyTorch transform to apply to every data instance (default = None).
     """
-    def __init__(self, exp_config, path, data_names = [], transform = None, reduce_len = -1, mask_path="", norm_percentile = 99):
+    def __init__(self, exp_config, path, data_names = [], transform = None, reduce_len = -1, mask_path="", norm_percentile = 99, normalization = 'minmax'):
         super().__init__()
         self.transform = transform
         self.main_path = path
         self.mask_path = mask_path
         self.reduce_len = reduce_len # for debugging, used in __len__
         self.norm_perc = norm_percentile
+        self.normalization = normalization
 
 
         if self.reduce_len != -1:
@@ -29,11 +31,11 @@ class HDF5Dataset3D(data.Dataset):
 
 
         if len(data_names) == 0:
-            self.image_paths = [self.main_path + s for s in os.listdir(path) if ('_x' in s)]
-            self.target_paths = [self.main_path + s for s in os.listdir(path) if ('_y' in s)]
+            self.image_paths = [self.main_path + s for s in os.listdir(self.main_path) if ('_x' in s)]
+            self.target_paths = [self.main_path + s for s in os.listdir(self.main_path) if ('_y' in s)]
 
             if self.mask_path != "":
-                self.mask_paths = [self.main_path + s for s in os.listdir(path) if ('_mask' in s)]
+                self.mask_paths = [self.mask_path + s for s in os.listdir(self.mask_path) if ('_mask' in s)]
             
         else:
             self.image_paths = [self.main_path + s['image']  + ".h5" for s in data_names]
@@ -55,10 +57,17 @@ class HDF5Dataset3D(data.Dataset):
             data_df = pd.read_csv(path_data_dict)
             self.patient_names = data_df['name']
             self.data_min, self.data_max, self.data_99_percentile = data_df['min'], data_df['max'], data_df['99per']
+            if self.normalization == 'z' or self.normalization == 'zscore':
+                if 'mean' in data_df.columns and 'var' in data_df.columns:
+                    self.data_mean, self.data_var = data_df['mean'], data_df['var']
+                else:
+                    self.data_mean, self.data_var = [],[]
         else:
             print('Did not find data dict for ',path_data_dict )
             data_df = None
             self.patient_names, self.data_min, self.data_max, self.data_99_percentile = [],[],[],[],
+            if self.normalization == 'z' or self.normalization == 'zscore':
+                self.data_mean, self.data_var = [],[]
 
     def __getitem__(self, index):
 
@@ -70,37 +79,51 @@ class HDF5Dataset3D(data.Dataset):
         if self.mask_path != "":
             reader_mask = h5py.File(self.mask_paths[index], 'r')
             mask = reader_mask['data'][()]
-            mask = mask.astype(np.bool)
+            mask = mask.astype(np.float32)
+            mask = torch.from_numpy(mask).unsqueeze(0)
         else:
             mask = []
 
         patient_name_current = os.path.basename(self.image_paths[index])[:-3]
-
-        if len(self.patient_names) != 0:
-            index_patient = np.where(self.patient_names == patient_name_current)[0][0]
-            min_value = self.data_min[index_patient]
-        else:
-            min_value = np.min(x)
-        
-
+        ################ Normalization ###################
         # scales the values between 0 and 1 
-        if self.norm_perc == 99:
-            if len(self.patient_names) != 0:
-                max_scale = self.data_99_percentile[index_patient]
-            else:
-                max_scale = np.percentile(x, 99)
+        index_patient = np.where(self.patient_names == patient_name_current)[0][0]
 
-        elif self.norm_perc == 100:
+        # Z Score Normalization
+        if self.normalization == 'z' or self.normalization == 'zscore':
             if len(self.patient_names) != 0:
-                max_scale = self.data_max[index_patient]
+                mean = self.data_mean[index_patient]
+                var = self.data_var[index_patient]
             else:
-                max_scale = np.max(x)
-
+                mean = np.mean(x)
+                var = np.var(x)
+            x = (x  - mean)/ np.sqrt(var)
+            
+        # Min Max Normalization
         else:
-            max_scale = np.percentile(x, self.norm_perc)
-        x = self.normalize_min_max(x,min_value,max_scale)
+            if len(self.patient_names) != 0:
+                
+                min_value = self.data_min[index_patient]
+            else:
+                min_value = np.min(x)
 
-        norm_params  = np.array([min_value, max_scale])
+            if self.norm_perc == 99:
+                if len(self.patient_names) != 0:
+                    max_scale = self.data_99_percentile[index_patient]
+                else:
+                    max_scale = np.percentile(x, 99)
+
+            elif self.norm_perc == 100:
+                if len(self.patient_names) != 0:
+                    max_scale = self.data_max[index_patient]
+                else:
+                    max_scale = np.max(x)
+
+            else:
+                max_scale = np.percentile(x, self.norm_perc)
+            x = self.normalize_min_max(x,min_value,max_scale)
+        
+        norm_params = np.array([self.data_min, self.data_max])
 
         x = x.astype(np.float32)
         y = y.astype(np.uint8)

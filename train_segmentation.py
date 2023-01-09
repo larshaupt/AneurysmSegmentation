@@ -63,6 +63,7 @@ def train(exp_config, fold_id, exp_cont = ""):
                         reduce_number = exp_config.num_training_files,
                         num_workers = exp_config.num_workers,
                         norm_percentile = exp_config.norm_percentile,
+                        normalization = exp_config.normalization,
                         )
 
     

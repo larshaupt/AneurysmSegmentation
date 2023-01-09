@@ -94,14 +94,15 @@ def convert_npy_2_hdf5(data_path, target_path):
 #%%
 #
 
-def write_file_dict(path, save=True):
+def write_file_dict(path, save=True, overwrite=False):
     file_attr = []
     save_path = os.path.join(path,'file_dict.csv')
     file_df = None
-    if not os.path.exists(save_path):
+    if not os.path.exists(save_path) or overwrite:
         functions = {'mean': np.mean,
                     'max': np.max,
                     'min': np.min,
+                    'var': np.var,
                     '95per': lambda x: np.percentile(x, 95),
                     '99per': lambda x: np.percentile(x, 99),
                     '5per': lambda x: np.percentile(x, 5),
@@ -111,7 +112,7 @@ def write_file_dict(path, save=True):
                     'median': np.median}
 
         for file_name in os.listdir(path):
-
+            print(file_name)
             if file_name.endswith('_x.h5'):
                 file_path = os.path.join(path, file_name)
                 reader_image = h5py.File(file_path, 'r')
@@ -140,7 +141,7 @@ def write_file_dict(path, save=True):
 
     return file_df
 
-#write_file_dict("/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias111/data")
+write_file_dict("/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias666/data", overwrite=True)
 # %%
 #for fold in os.listdir(os.path.join(path_to_external_data_hd5f, 'folds')):
 #    fold_path = os.path.join(path_to_external_data_hd5f, 'folds', fold)

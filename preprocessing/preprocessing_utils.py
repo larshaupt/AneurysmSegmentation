@@ -97,10 +97,11 @@ def read_data_names(path_to_processed_data, check_dim= False, full_path=False, k
     # puts all the filenames in x and y
     for file_name in os.listdir(path_to_processed_data):
         file_path = os.path.join(path_to_processed_data, file_name)
-        if file_path.endswith('_x.npy') or file_path.endswith('_x.h5'):
+        if file_path.endswith('_x.npy') or file_path.endswith('_x.h5') or file_path.endswith('_x.nii.gz'):
             x.append(file_name)
-        elif file_path.endswith('_y.npy') or file_path.endswith('_y.h5'):
+        elif file_path.endswith('_y.npy') or file_path.endswith('_y.h5') or file_path.endswith('_y.nii.gz'):
             y.append(file_name)
+        
         else: 
             print('Error: ', file_name)
 

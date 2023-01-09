@@ -1,6 +1,6 @@
 # %%
 import sys
-sys.path.append('../')
+sys.path.append('/srv/beegfs02/scratch/brain_artery/data/Segmentation3D')
 
 import train.utils as ut
 from data import transformations, data_loader, HDF5Dataset3D
@@ -19,171 +19,7 @@ import nibabel as nib
 from importlib.machinery import SourceFileLoader
 import os
 import numpy as np
-
-
-#%%
-
-
-
-def make_predictions(
-            experiment_names,
-            pre_trained_path,
-            epoch = 'best_model.pth',
-            save_path = None, 
-            img = True,  
-            gifs = False, 
-            nifti = False, 
-            split = 'test', 
-            num = -1,
-            num_slices = 5, 
-            tf_mode='val',
-            scale_factor = (1.0,1.0,1.0),
-            save = True,
-            binarize_target = True,
-            config_overwrite:dict = None,
-            postprocessing:bool = False,
-            postfix = ""):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    predictor = ut.Predictor(experiment_names, pre_trained_path, epoch=epoch, config_overwrite = config_overwrite, postprocessing=postprocessing, device=device)
-    exp_config = predictor.get_exp_config(experiment_names[0])
-    data_names = ut.load_split(exp_config.path_split.replace("_downscaled", "d"), exp_config.fold_id, split=split)
-    if tf_mode == 'train':
-        tf = exp_config.tf_train
-    elif tf_mode == 'val' and hasattr(exp_config, 'tf_val'):
-        tf = exp_config.tf_val 
-    else:
-        tf = exp_config.tf_test
-    path_to_gifs, path_to_imgs, path_to_nifti = None, None, None
-    ds_data = HDF5Dataset3D.HDF5Dataset3D(exp_config, exp_config.path_data.replace("_downscaled", "d"), data_names, tf)
-    data_loader = torch.utils.data.DataLoader(ds_data, batch_size = 1, shuffle = False, num_workers = 0, pin_memory=False)
-
-    if save:
-        save_path = os.path.join(save_path, predictor.get_all_exp_names_comp() + postfix)
-        model_pred_path_split = os.path.join(save_path, f'{split}_tf{tf_mode}')
-        if gifs:
-            path_to_gifs = os.path.join(model_pred_path_split, 'gifs/')
-        if img:
-            path_to_imgs = os.path.join(model_pred_path_split, 'img/')
-        if nifti:
-            path_to_nifti = os.path.join(model_pred_path_split, 'nifti/')
-        model_scores_path = os.path.join(model_pred_path_split, "scores.csv")
-
-        ut.make_dirs([save_path, model_pred_path_split, path_to_gifs, path_to_imgs, path_to_nifti])
-
-    metric = MetricesStruct(exp_config.criterion_metric, prefix='')
-
-
-    for i, (data, target, mask ,norm_params, name) in enumerate(data_loader):
-
-        print(f"Predicting {name}")
-        if i >= num and num!=-1:
-            break
-        
-        pred = predictor.predict_all_combine(data)
-
-        metric.update(pred, target, el_name=name[0])
-        print(metric.get_last_scores())
-        if save:
-            save_pred(data, target, 
-                norm_params, 
-                name, 
-                pred ,
-                num_slices = num_slices, 
-                path_to_gifs=path_to_gifs, 
-                path_to_imgs=path_to_imgs, 
-                path_to_nifti = path_to_nifti, 
-                scale_factor=scale_factor, 
-                target_label=exp_config.target_label)
-
-    scores = metric.get_single_score_per_name()
-    print(f"Scores for {predictor.get_all_exp_names()} with {tf_mode} transform on {split} split:")
-    scores_df = pd.DataFrame(data=scores).transpose()
-    scores_df.name = predictor.get_all_exp_names_comp()
-    print(scores_df.to_string())
-    if save:
-        scores_df.to_csv(model_scores_path)
-
-
-
-def save_pred(
-        data, 
-        target, 
-        norm_params, 
-        name, pred,
-        num_slices = 10,  
-        path_to_gifs=None, 
-        path_to_imgs=None, 
-        path_to_nifti = None,
-        scale_factor = (1.0,1.0,1.0),
-        binarize_target = True,
-        target_label = 4):
-
-    print(f'Saving {name} to {path_to_imgs} ')
-
-
-    target_channel = target_label if pred.shape[1] >=target_label else pred.shape[1] - 1
-    pred_bin = ut.binarize(pred).detach().numpy()[0,0,...]
-    if binarize_target:
-        target = ut.binarize(target)
-        target = target.detach().numpy()[0,0,...]
-    else:
-        target = target.detach().numpy()[0,target_channel,...]
-    
-    pred = pred.detach().numpy()[0,target_channel,...]
-
-
-    data = data.detach().numpy()[0,0,...]
-
-    name = name[0]
-
-    norm_params = norm_params.detach().numpy()
-    min_value, perc99_value = norm_params[0,0], norm_params[0,1]
-    data = data*(perc99_value-min_value) + min_value
-    save_dict = {
-        'pred_bin': pred_bin,
-        'pred': pred,
-        'target' : target,
-        'data' :  data
-    }
-
-    if path_to_gifs:
-        path_to_single_gif = os.path.join(path_to_gifs, str(name))
-        ut.make_dirs([path_to_single_gif])
-    
-        for key in save_dict:
-            item = np.squeeze(save_dict[key])
-                
-            gif_path = os.path.join(path_to_single_gif, key + '.gif')
-            animate_img(item, save_path=gif_path, size='large')
-
-    if path_to_imgs:
-
-        path_to_single_img = os.path.join(path_to_imgs, str(name))
-        ut.make_dirs([path_to_single_img])
-
-        for key in save_dict:
-            item = np.squeeze(save_dict[key])
-            slices = ut.find_slices(target, num=num_slices, ratio_pos=0.75)
-            for count_slice, slice in enumerate(slices):
-                fig = plt.figure()
-                ax = fig.add_subplot(111)
-                img_path = os.path.join(path_to_single_img, str(count_slice) + '_' + key + '.png')
-                ax.imshow(item[:,:,int(slice[-1])])
-                ax.set_axis_off()
-                fig.savefig(img_path)
-                plt.close(fig)
-
-    if path_to_nifti:
-        path_to_single_nifti = os.path.join(path_to_nifti, str(name))
-        ut.make_dirs([path_to_single_nifti])
-        
-        for key in save_dict:
-            item = np.squeeze(save_dict[key])
-            nifti_path = os.path.join(path_to_single_nifti, key + '.nii.gz')
-            voxel_size = (0.3 / scale_factor[0], 0.3 / scale_factor[1], 0.6 / scale_factor[2])
-            save_to_nifti(item, nifti_path, voxel_size)
-
- 
+from test_utils import save_pred, make_predictions
 
 
 
@@ -193,15 +29,147 @@ experiment_names_adam= ['Adam_sweep_1672475897', 'Adam_sweep_1672501329', 'Adam_
 experiment_names = ['USZ_BrainArtery_bias_sweep_1672678241']
 experiment_names_best_bce = ["USZ_BrainArtery_bias_sweep_1672864585", "USZ_BrainArtery_bias_sweep_1672860029", "USZ_BrainArtery_bias_sweep_1672859412", "USZ_BrainArtery_bias_sweep_1672846254","USZ_BrainArtery_bias_sweep_1672846264" ] #best model run
 experiment_names_best_softdice = ["USZ_BrainArtery_bias_sweep_1672860983", "USZ_BrainArtery_bias_sweep_1672859830", "USZ_BrainArtery_bias_sweep_1672849038", "USZ_BrainArtery_bias_sweep_1672846264","USZ_BrainArtery_bias_sweep_1672846264" ] #best model run
-experiment_names = experiment_names_best_softdice + experiment_names_best_bce + experiment_names_adam
+experiment_names_best_translr = ['USZ_BrainArtery_bias_sweep_1672918520', 'USZ_BrainArtery_bias_sweep_1672914714', 'USZ_BrainArtery_bias_sweep_1672914729', 'USZ_BrainArtery_bias_sweep_1672914739', 'USZ_BrainArtery_bias_sweep_1672914713']
+experiment_names_wholevol22 = ['USZ_BrainArtery_bias111_sweep_1673034756', 'USZ_BrainArtery_bias111_sweep_1673037679', 'USZ_BrainArtery_bias111_sweep_1673018837', 'USZ_BrainArtery_bias111_sweep_1673000985', 'USZ_BrainArtery_bias111_sweep_1672981931']
+experiment_names_wholevol3 = ['USZ_BrainArtery_bias111_sweep_1673023809','USZ_BrainArtery_bias111_sweep_1673007015','USZ_BrainArtery_bias111_sweep_1672989580','USZ_BrainArtery_bias111_sweep_1672970792'] #USZ_BrainArtery_bias111_sweep_1673034757
+
+experiment_names_wholevol1 = ['USZ_BrainArtery_bias111_sweep_1673034941','USZ_BrainArtery_bias111_sweep_1673034247','USZ_BrainArtery_bias111_sweep_1673013749','USZ_BrainArtery_bias111_sweep_1672995677','USZ_BrainArtery_bias111_sweep_1672977086']
+experiment_names_wholevoldice3 = ['USZ_BrainArtery_bias111_sweep_1673135808_4',
+ 'USZ_BrainArtery_bias111_sweep_1673125252_3',
+ 'USZ_BrainArtery_bias111_sweep_1673122100_2',
+ 'USZ_BrainArtery_bias111_sweep_1673109693_1',
+ 'USZ_BrainArtery_bias111_sweep_1673109692_0']
+experiment_names_wholevoldice22 = ['USZ_BrainArtery_bias111_sweep_1673135808_4',
+ 'USZ_BrainArtery_bias111_sweep_1673125252_3',
+ 'USZ_BrainArtery_bias111_sweep_1673122100_2',
+ 'USZ_BrainArtery_bias111_sweep_1673109693_1',
+ 'USZ_BrainArtery_bias111_sweep_1673109692_0']
+
+experiment_names_wholevoldice1 = ['USZ_BrainArtery_bias111_sweep_1673136630_4',
+ 'USZ_BrainArtery_bias111_sweep_1673132155_3',
+ 'USZ_BrainArtery_bias111_sweep_1673122432_2',
+ 'USZ_BrainArtery_bias111_sweep_1673109692_0',
+ 'USZ_BrainArtery_bias111_sweep_1673109704_1']
+
+experiment_names_patchbce3  = ['USZ_BrainArtery_bias_sweep_1672465444_4',
+ 'USZ_BrainArtery_bias_sweep_1672424097_3',
+ 'USZ_BrainArtery_bias_sweep_1672364412_2',
+ 'USZ_BrainArtery_bias_sweep_1672308271_1',
+ 'USZ_BrainArtery_bias_sweep_1672252138_0']
+
+experiment_names_patchbce1  = ['USZ_BrainArtery_bias_sweep_1672476739_4',
+ 'USZ_BrainArtery_bias_sweep_1672437140_3',
+ 'USZ_BrainArtery_bias_sweep_1672373421_2',
+ 'USZ_BrainArtery_bias_sweep_1672321174_1',
+ 'USZ_BrainArtery_bias_sweep_1672266130_0']
+
+experiment_names_mixtrain = ['USZ_BrainArtery_bias_sweep_1673066297_4',
+ 'USZ_BrainArtery_bias_sweep_1673046784_3',
+ 'USZ_BrainArtery_bias_sweep_1672970716_1',
+ 'USZ_BrainArtery_bias_sweep_1672970716_2',
+ 'USZ_BrainArtery_bias_sweep_1672970713_0']
+experiment_names = experiment_names_patchbce1
+
+experiment_names = [exp_n if exp_n[-2] != '_' else exp_n[:-2] for exp_n in experiment_names]
 
 model_name = 'best_model.pth'
 pre_trained_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained'
 save_path = '/srv/beegfs02/scratch/brain_artery/data/training/predictions/'
 
-config_overwrite = {'val_threshold_cc' : 100, 'val_threshold_data': 1.0}
-# %%
+config_overwrite = {'val_threshold_data': 0.8, "apply_mask": False, "val_threshold_cc": 50, "val_threshold_cc_max": 10000, "crop_sides": True, 'compute_mdice': True, "add_own_hausdorff": True}
+
 make_predictions( 
+            experiment_names,
+            pre_trained_path, 
+            epoch = model_name,
+            save_path = save_path, 
+            img=True,  
+            gifs = False, 
+            nifti=True, 
+            split = 'test', 
+            num_slices = 5, 
+            num=-1 ,
+            tf_mode='val', 
+            voxel_size = (0.3,0.3,0.6),
+            save = False,
+            binarize_target = True,
+            config_overwrite = config_overwrite,
+            postprocessing= False,
+            postfix = "_bestbce",
+            aggregation_strategy = "mean",
+            factor=1.0,
+            softmax=False)  
+
+input_dict = {"experiment_names":experiment_names,
+            "pre_trained_path":pre_trained_path,
+            "epoch":model_name,
+            "save_path":save_path,
+            "img":True,
+            "gifs":False,
+            "nifti":True,
+            "split":'test',
+            "num_slices": 5,
+            "num":-1,
+            "tf_mode":'test',
+            "voxel_size":(0.3, 0.3, 6.0),
+            "save":False,
+            "binarize_target":True,
+            "config_overwrite":config_overwrite,
+            "postprocessing":True,
+            "postfix":"_alladam_wp",
+            "softmax": "max"
+            }
+
+
+
+run_params = [{"experiment_names":experiment_names_best_softdice + experiment_names_best_bce,
+            "postprocessing":True,
+            "factor":1.0,
+            "aggregation_strategy":"mean",
+            "config_overwrite":{'val_threshold_data': 0.8, "apply_mask": True, "val_threshold_cc": 100, "val_threshold_cc_max": 5000, "crop_sides": True},
+            "postfix":"_all_wp_1"},
+            {"experiment_names":experiment_names_best_softdice + experiment_names_best_bce,
+            "postprocessing":True,
+            "factor":2.0,
+            "aggregation_strategy":"mean",
+            "config_overwrite":{'val_threshold_data': 0.8, "apply_mask": True, "val_threshold_cc": 100, "val_threshold_cc_max": 5000, "crop_sides": True},
+            "postfix":"_all_wp_2"},
+            {"experiment_names":experiment_names_best_softdice + experiment_names_best_bce,
+            "postprocessing":True,
+            "factor":3.0,
+            "aggregation_strategy":"mean",
+            "config_overwrite":{'val_threshold_data': 0.8, "apply_mask": True, "val_threshold_cc": 100, "val_threshold_cc_max": 5000, "crop_sides": True},
+            "postfix":"_all_wp_3"},
+            {"experiment_names":experiment_names_best_softdice + experiment_names_best_bce + experiment_names_best_translr,
+            "postprocessing":True,
+            "factor":1.0,
+            "aggregation_strategy":"mean",
+            "config_overwrite":{'val_threshold_data': 0.8, "apply_mask": True, "val_threshold_cc": 100, "val_threshold_cc_max": 5000, "crop_sides": True},
+            "postfix":"_alltl_wp_1",},
+            {"experiment_names": experiment_names_best_translr,
+            "postprocessing":True,
+            "factor":1.0,
+            "aggregation_strategy":"mean",
+            "config_overwrite":{'val_threshold_data': 0.8, "apply_mask": True, "val_threshold_cc": 100, "val_threshold_cc_max": 5000, "crop_sides": True},
+            "postfix":"_tl_wp_1",},
+            {"experiment_names": experiment_names_best_translr,
+            "postprocessing":True,
+            "factor":1.0,
+            "aggregation_strategy":"max",
+            "config_overwrite":{'val_threshold_data': 0.8, "apply_mask": True, "val_threshold_cc": 100, "val_threshold_cc_max": 5000, "crop_sides": True},
+            "postfix":"_tl_wp_max",}
+            ]
+# %%
+def run_sweep():
+    for run_param in run_params:
+        print(run_param)
+        input_dict.update(run_param)
+        print(input_dict)
+        make_predictions(**input_dict)
+
+#run_sweep()  
+
+""" make_predictions( 
             experiment_names,
             pre_trained_path, 
             epoch = model_name,
@@ -218,7 +186,7 @@ make_predictions(
             binarize_target = True,
             config_overwrite = config_overwrite,
             postprocessing= True,
-            postfix = "_alladam_wp")
+            postfix = "_alladam_wp") """
 
 
 # %%

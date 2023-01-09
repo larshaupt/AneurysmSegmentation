@@ -1,3 +1,4 @@
+
 import nibabel as nib
 import nilearn
 from nilearn.plotting import plot_anat, plot_roi
@@ -9,84 +10,90 @@ import os
 import pickle
 import numpy as np
 import multiprocessing
+import ants
+import shutil
 
-
-save_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/affines'
+save_path = '/srv/beegfs02/scratch/brain_artery/data/training/affines_inv'
 atlas_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/Atlas'
 atlas_tof_path = os.path.join(atlas_path, 'tofAverage.nii.gz')
 
 vessel_path = os.path.join(atlas_path, 'vesselProbabilities.nii.gz')
 radius_path = os.path.join(atlas_path, 'vesselRadius.nii.gz')
+#data_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Sharing/ADAM_Challenge/ADAM_release_subjs'
 data_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_nifti/data'
+img_fix = ants.image_read(atlas_tof_path)
 
-template_img = nib.load(atlas_tof_path)
-template_data = template_img.get_fdata()
-template_affine = template_img.affine
 
-all_files = list(os.listdir(data_path))
+all_files = [os.path.join(data_path,f ) for f in list(os.listdir(data_path))]
 x_files = [f for f in all_files if f.endswith('_x.nii.gz')]
 
-x_files = sorted(x_files)
+#x_files = [os.path.join(data_path, f, "pre", "TOF.nii.gz") for f in os.listdir(data_path)]
+#x_files = sorted(x_files)
 
 
+def compute_registration(x_path, save_path, img_atlas, data_path, save_plot=True, overwrite=False, deformable=False):
+    #x_name = os.path.basename(x_path[:-15])
+    x_name = os.path.basename(x_path[:-9])
 
-def compute_registration(x_name, save_path, template_data, template_affine, data_path, save_plot=True, overwrite=False):
+    file_save_path = os.path.join(save_path, x_name)
+    print(file_save_path + '_fwd.mat')
 
-    print(x_name)
-
-    if os.path.exists(os.path.join(save_path, x_name[:-9] + '_affine.npy')) and not overwrite:
+    if os.path.exists(file_save_path + '_fwd.mat') and not overwrite:
         print('Already computed')
         return
-        
-    img_path = os.path.join(data_path, x_name)
-
-    image = nib.load(img_path)
-    image_data = image.get_fdata()
-    image_affine = image.affine
-
-    moving_data, moving_affine = image_data, image_affine
-    static_data, static_affine = template_data, template_affine
 
 
+    img_fix = ants.image_read(x_path)
+    img_move = img_atlas
+    
     ## Parameters ##
-    pipeline = ["center_of_mass", "translation", "rigid", "affine"]
-    sigmas = [3.0, 1.0, 0.0]
-    factors = [4, 2, 1]
-    level_iters = [10000, 1000, 100]
 
     ## Registration ##
 
-    xformed_img, reg_affine = affine_registration(
-        moving_data,
-        static_data,
-        moving_affine=moving_affine,
-        static_affine=static_affine,
-        nbins=32,
-        metric='MI',
-        pipeline=pipeline,
-        level_iters=level_iters,
-        sigmas=sigmas,
-        factors=factors)
 
-    np.save(os.path.join(save_path, x_name[:-9] + '_affine.npy'), reg_affine)
+    mytx_syn = ants.registration(fixed=img_fix, moving=img_move, 
+        type_of_transform="Affine",
+        aff_metric = 'mattes',
+        syn_metric = 'mattes')
+    print(mytx_syn['fwdtransforms'])
+    transformed = ants.apply_transforms(fixed=img_fix, moving=img_move, transformlist=mytx_syn['fwdtransforms'])
     
-    affine_transform = AffineMap(reg_affine,template_data.shape, template_affine,moving_data.shape, moving_affine)
-    transformed = affine_transform.transform(moving_data)
-
     if save_plot:
-        regtools.overlay_slices(template_data, transformed, None, 0,"Template", "Moving", fname=os.path.join(save_path, x_name[:-9] + '_overlay0.png'))
-        regtools.overlay_slices(template_data, transformed, None, 1,"Template", "Moving", fname=os.path.join(save_path, x_name[:-9] + '_overlay1.png'))
-        regtools.overlay_slices(template_data, transformed, None, 2,"Template", "Moving", fname=os.path.join(save_path, x_name[:-9] + '_overlay2.png'))
+        
+        regtools.overlay_slices(img_fix.view(), transformed.view(), None, 0,"Template", "Moving", fname=file_save_path + '_overlay0.png')
+        regtools.overlay_slices(img_fix.view(), transformed.view(), None, 1,"Template", "Moving", fname=file_save_path + '_overlay1.png')
+        regtools.overlay_slices(img_fix.view(), transformed.view(), None, 2,"Template", "Moving", fname=file_save_path + '_overlay2.png')
 
-    return reg_affine
 
+
+    ants.write_transform(ants.read_transform(mytx_syn['fwdtransforms'][0]), file_save_path + '_fwd.mat')
+    ants.write_transform(ants.read_transform(mytx_syn['invtransforms'][0]), file_save_path + '_inv.mat')
+    
+    if deformable:
+        shutil.move(mytx_syn['fwdtransforms'][1], file_save_path + '_fwd.nii.gz')
+        shutil.move(mytx_syn['invtransforms'][1], file_save_path + '_inv.nii.gz')
+
+
+
+    if os.path.exists(mytx_syn['fwdtransforms'][0]):
+        os.remove(mytx_syn['fwdtransforms'][0])
+    if os.path.exists(mytx_syn['invtransforms'][0]):
+        os.remove(mytx_syn['invtransforms'][0])
+    if deformable:
+        if os.path.exists(mytx_syn['fwdtransforms'][1]):
+            os.remove(mytx_syn['fwdtransforms'][1])
+        if os.path.exists(mytx_syn['invtransforms'][1]):
+            os.remove(mytx_syn['invtransforms'][1])
+
+    return None
 
 def run_process(every_n = 4, start_i = 0):
     for i in range(start_i, len(x_files), every_n):
-        compute_registration(x_files[i], save_path, template_data, template_affine, data_path, save_plot=True)
+        compute_registration(x_files[i], save_path, img_fix, data_path, save_plot=True, overwrite=False)
+#run_process(1,0)
 
 ps = []
-n = 2
+n = 3
 split_dif = n
 split_id = 0
 for k in range(split_id*split_dif, split_dif*(split_id+1)):

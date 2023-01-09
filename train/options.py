@@ -142,9 +142,12 @@ class Options:
         self.parser.add_argument('--training_dataset', default='train', help='dataset name')
         self.parser.add_argument('--validation_dataset', default='val', help='dataset name')
         self.parser.add_argument('--test_dataset', default='test', help='dataset name')
+        self.parser.add_argument('--normalization', default='minmax', choices=['minmax', 'zscore'], help='Normalization strategy')
+        
         self.parser.add_argument('--grid_validation', choices=('True','False'), default='False', help='Use grid patching for validation?')
         self.parser.add_argument('--compute_mdice', choices=('True','False'), default='False', help='Compute Multiclass Dice? Needs more memory')
         self.parser.add_argument('--metric_train', type=str, default="reduced", help='Options are full, reduced, none')
+        self.parser.add_argument('--add_own_hausdorff', choices=('True','False'), default='False', help='Compute our Hausdorff? Needs more memory')
 
 
         self.parser.add_argument('--shuffle_train',choices=('True','False'), default='True', help='shuffle_train')
@@ -216,7 +219,7 @@ class Options:
 
     def interpret_params(self):
 
-        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate", "neighboring_vessels", "det_val_crop", "apply_mask"]:
+        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate", "neighboring_vessels", "det_val_crop", "apply_mask", "add_own_hausdorff"]:
             if hasattr(self.opt, el):
                 if isinstance(vars(self.opt)[el], str):
                     vars(self.opt)[el] = eval(vars(self.opt)[el])
@@ -391,14 +394,18 @@ class Options:
                     "VolSimilarity": VolumetricSimilarityMetric()
                     }
         else:
+            voxel_size = (1.0,1.0,1.0) if "111" in self.opt.dataset else (0.3,0.3,0.6)
             self.opt.criterion_metric =  {                    
                 "Dice": TargetLabelMetric(DiceMetric(), new_target_label),
                 "Recall": TargetLabelMetric(RecallMetric(), new_target_label),
                 "Precision": TargetLabelMetric(PrecisionMetric(), new_target_label),
                 "Hausdorff": TargetLabelMetric(HausDorffMetricMonai(percentile=99), new_target_label),
                 "VolSimilarity": TargetLabelMetric(VolumetricSimilarityMetric(), new_target_label),
-                "MDice": MultiClassDiceMetric(include_background=True) if self.opt.compute_mdice else None
+                "MDice": MultiClassDiceMetric(include_background=True) if self.opt.compute_mdice else None,
+                "HausdorffOurs": TargetLabelMetric(HausDorffMetric(percentile=95, voxel_size = voxel_size), new_target_label) if self.opt.add_own_hausdorff else None
                     }
+
+
 
         if not hasattr(self.opt, 'metric_train'):
             self.opt.criterion_metric_train = self.opt.criterion_metric      
@@ -519,6 +526,13 @@ class Options:
 
         if not hasattr(self.opt, 'apply_mask'):
             self.opt.apply_mask = False
+        if not hasattr(self.opt, 'val_threshold_cc_max'):
+            self.opt.val_threshold_cc_max = -1
+        if not hasattr(self.opt, 'add_own_hausdorff'):
+            self.opt.add_own_hausdorff = False
+        
+        if not hasattr(self.opt, 'normalization'):
+            self.opt.normalization = 'minmax'
             
     def load_from_args(self):
         self.opt = copy.deepcopy(self.inp)

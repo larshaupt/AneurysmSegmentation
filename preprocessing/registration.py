@@ -7,12 +7,15 @@ from dipy.align.imaffine import (AffineMap,MutualInformationMetric,AffineRegistr
 from dipy.align.transforms import (TranslationTransform3D,RigidTransform3D,AffineTransform3D)
 import os
 from preprocessing_utils import *
+import SimpleITK as sitk
+import sys
+import ants
 
 
 atlas_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/Atlas'
 atlas_tof_path = os.path.join(atlas_path, 'tofAverage.nii.gz')
-img_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_nifti/data/02014629_KO_MCA_x.nii.gz'
-target_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_nifti/data/02014629_KO_MCA_y.nii.gz'
+img_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_nifti/data/02053152-MCA-rechts-NEW_x.nii.gz'
+target_path = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_nifti/data/02053152-MCA-rechts-NEW_x.nii.gz'
 vessel_path = os.path.join(atlas_path, 'vesselProbabilities.nii.gz')
 radius_path = os.path.join(atlas_path, 'vesselRadius.nii.gz')
 #%%
@@ -114,3 +117,76 @@ mask = (vessel_tr > 1) * (moving_data > 100) * (radius_tr > 0.5)
 plt.imshow((moving_data*mask)[:,:,100], cmap='gray', origin='lower')
 plt.imshow((target_data*~mask)[:,:,100], cmap='rainbow', alpha=0.8, origin='lower')
  # %%
+
+
+def command_iteration(method):
+    print(
+        f"{method.GetOptimizerIteration():3} "
+        + f"= {method.GetMetricValue():10.5f} "
+        + f": {method.GetOptimizerPosition()}"
+    )
+
+
+if len(sys.argv) < 4:
+    print(
+        "Usage:",
+        sys.argv[0],
+        "<fixedImageFilter> <movingImageFile>",
+        "<outputTransformFile>",
+    )
+    sys.exit(1)
+
+fixed = sitk.ReadImage(img_path, sitk.sitkFloat32)
+
+moving = sitk.ReadImage(vessel_path, sitk.sitkFloat32)
+
+R = sitk.ImageRegistrationMethod()
+R.SetMetricAsMeanSquares()
+R.SetOptimizerAsRegularStepGradientDescent(4.0, 0.01, 200)
+R.SetInitialTransform(sitk.TranslationTransform(fixed.GetDimension()))
+R.SetInterpolator(sitk.sitkLinear)
+
+R.AddCommand(sitk.sitkIterationEvent, lambda: command_iteration(R))
+
+outTx = R.Execute(fixed, moving)
+
+print("-------")
+print(outTx)
+print(f"Optimizer stop condition: {R.GetOptimizerStopConditionDescription()}")
+print(f" Iteration: {R.GetOptimizerIteration()}")
+print(f" Metric value: {R.GetMetricValue()}")
+
+sitk.WriteTransform(outTx, sys.argv[3])
+
+if "SITK_NOSHOW" not in os.environ:
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetReferenceImage(fixed)
+    resampler.SetInterpolator(sitk.sitkLinear)
+    resampler.SetDefaultPixelValue(100)
+    resampler.SetTransform(outTx)
+
+    out = resampler.Execute(moving)
+    simg1 = sitk.Cast(sitk.RescaleIntensity(fixed), sitk.sitkUInt8)
+    simg2 = sitk.Cast(sitk.RescaleIntensity(out), sitk.sitkUInt8)
+    cimg = sitk.Compose(simg1, simg2, simg1 // 2.0 + simg2 // 2.0)
+    sitk.Show(cimg, "ImageRegistration1 Composition")
+
+# %%
+
+img_fix = ants.image_read(atlas_tof_path)
+img_move = ants.image_read(img_path)
+mytx_syn = ants.registration(fixed=img_fix, moving=img_move, 
+    type_of_transform="Affine",
+    aff_metric = 'mattes',
+    syn_metric = 'mattes')
+# %%
+
+
+transformed = ants.apply_transforms(fixed=img_move, moving=img_fix, transformlist=mytx_syn['fwdtransforms'])
+
+
+regtools.overlay_slices(img_move.view(), transformed.view(), None, 0,"Template", "Moving")
+regtools.overlay_slices(img_move.view(), transformed.view(), None, 1,"Template", "Moving")
+regtools.overlay_slices(img_move.view(), transformed.view(), None, 2,"Template", "Moving")
+
+# %%

@@ -119,7 +119,7 @@ def _validate(exp_config, model, loader_val, epoch, device, val_loss, logger):
                         pred = torch.sigmoid(pred_logits)
 
 
-                
+                pred = binarize(pred)
                 
                 if hasattr(exp_config, "tf_post"):
                     sample = {'image': data.squeeze(0), 'pred': pred.squeeze(0), 'mask': mask.squeeze(0)}

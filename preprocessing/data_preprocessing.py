@@ -16,7 +16,7 @@ path_to_data = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArte
 path_to_external_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_processed/data'
 path_to_exterinal_header = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_processed/header'
 path_to_preprocessed_nifti = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_nifti/data'
-path_to_masks = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_be_nifti/data'
+path_to_masks = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/USZ_BrainArtery_bias_nifti/data'
 import sys
 sys.path.append(os.path.join(path_to_repo, "src/utils/"))
 
@@ -74,10 +74,10 @@ def extract_preprocessed_files(path_to_data, path_to_masks):
     for mri_file_name in os.listdir(path_to_masks):
         mri_file_path = os.path.join(path_to_masks, mri_file_name)
         if not os.path.isdir(mri_file_path) and not mri_file_name.startswith('.'):
-            if mri_file_path.endswith('_mask.nii.gz'):
+            if mri_file_path.endswith('_atlasn.nii.gz'):
 
                 masks.append(mri_file_path)
-    assert len(masks) == len(x_files) == len(y_files)
+    assert len(masks) == len(x_files) == len(y_files), print(len(masks), len(x_files), len(y_files))
     masks, x_files, y_files = sorted(masks), sorted(x_files), sorted(y_files)
     
     for x,y,m in zip(x_files, y_files, masks):
@@ -261,13 +261,13 @@ def run_process(every_n = 4, start_i = 0):
         save_as="h5", 
         overwrite=True, 
         label_mapping='',
-        include_mask=False,
-        skip_label=False,
-        skip_tof=False,
+        include_mask=True,
+        skip_label=True,
+        skip_tof=True,
         )
 
 ps = []
-n = 8
+n = 6
 split_dif = n
 split_id = 0
 for k in range(split_id*split_dif, split_dif*(split_id+1)):

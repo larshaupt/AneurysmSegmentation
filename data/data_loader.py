@@ -22,7 +22,8 @@ def load_datasets(exp_config,
             train_val_test=(), 
             reduce_number = -1, 
             num_workers=4,
-            norm_percentile = 99):
+            norm_percentile = 99,
+            normalization:str = 'minmax'):
 
 
     train_loader, val_loader, test_loader = get_data_loaders_hdf53d(
@@ -38,7 +39,8 @@ def load_datasets(exp_config,
                                             train_val_test = train_val_test, 
                                             reduce_number = reduce_number, 
                                             num_workers = num_workers,
-                                            norm_percentile = 99)
+                                            norm_percentile = norm_percentile,
+                                            normalization = normalization)
 
     return train_loader, val_loader, test_loader
 
@@ -69,14 +71,22 @@ def get_single_data_loader_hdf53d(exp_config,
                     extra_train_set = None, 
                     extra_data_names = [],
                     norm_percentile = 99,
+                    include_mask = False,
+                    normalization:str = 'minmax'
                     ):
 
     if not os.path.exists(path_data):
         raise FileNotFoundError(f"Could not find {path_data}.")
-    
+    if include_mask:
+        mask_path = path_data
+    else:
+        mask_path = ""
     if data_names == None:
         x,y = preprocessing_utils.read_data_names(path_data,keep_ending=False)
         data_names = [{'image': x_el, 'target': y_el} for x_el, y_el in zip(x,y)]
+    if include_mask:
+        for el in data_names:
+            el['mask'] = el['target'].replace('_y','_mask')
 
     if extra_train_set != None:
         if not os.path.exists(extra_train_set):
@@ -84,9 +94,9 @@ def get_single_data_loader_hdf53d(exp_config,
         if extra_data_names == None:
             x,y = preprocessing_utils.read_data_names(extra_train_set,keep_ending=False)
             extra_data_names = [{'image': x_el, 'target': y_el} for x_el, y_el in zip(x,y)]
-        ds = HDF5Dataset3D.HDF5Dataset3D_multiple(exp_config, path_data, data_names, path_2 = extra_train_set, data_names_2=extra_data_names, transform = tf, reduce_len = reduce_number,norm_percentile = norm_percentile)
+        ds = HDF5Dataset3D.HDF5Dataset3D_multiple(exp_config, path_data, data_names,mask_path=mask_path, path_2 = extra_train_set, data_names_2=extra_data_names, transform = tf,reduce_len = reduce_number,norm_percentile = norm_percentile, normalization = normalization)
     else:
-        ds = HDF5Dataset3D.HDF5Dataset3D(exp_config, path_data, data_names, tf, reduce_number, norm_percentile = norm_percentile)
+        ds = HDF5Dataset3D.HDF5Dataset3D(exp_config, path_data, data_names, tf, reduce_number, norm_percentile = norm_percentile, mask_path=mask_path, normalization = normalization)
     loader = torch.utils.data.DataLoader(ds, batch_size = batch_size, shuffle = True, num_workers = min(num_workers, batch_size), pin_memory = True)
 
     return loader
@@ -104,7 +114,9 @@ def get_data_loaders_hdf53d(exp_config,
                 train_val_test = (), 
                 reduce_number = -1, 
                 num_workers = 4,
-                norm_percentile = 99):
+                norm_percentile = 99,
+                normalization = 'minmax',
+                include_mask = False):
     
 
 
@@ -137,7 +149,8 @@ def get_data_loaders_hdf53d(exp_config,
                                     reduce_number = reduce_number, 
                                     num_workers = num_workers, 
                                     extra_train_set = path_data_extra, 
-                                    extra_data_names = train_names_extra)
+                                    extra_data_names = train_names_extra,
+                                    normalization = normalization)
 
 
     val_loader = get_single_data_loader_hdf53d(exp_config = exp_config, 
@@ -148,7 +161,9 @@ def get_data_loaders_hdf53d(exp_config,
                                     reduce_number = reduce_number, 
                                     num_workers = num_workers, 
                                     extra_train_set = None, 
-                                    extra_data_names = val_names_extra)
+                                    extra_data_names = val_names_extra,
+                                    include_mask=include_mask,
+                                    normalization = normalization)
 
     test_loader = get_single_data_loader_hdf53d(exp_config = exp_config, 
                                     batch_size = batch_size_test, 
@@ -158,7 +173,9 @@ def get_data_loaders_hdf53d(exp_config,
                                     reduce_number = reduce_number, 
                                     num_workers = num_workers, 
                                     extra_train_set = None, 
-                                    extra_data_names = test_names_extra)
+                                    extra_data_names = test_names_extra,
+                                    include_mask=include_mask,
+                                    normalization = normalization)
     
     return train_loader, val_loader, test_loader
 
