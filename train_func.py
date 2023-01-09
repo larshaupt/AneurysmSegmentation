@@ -124,7 +124,7 @@ def _validate(exp_config, model, loader_val, epoch, device, val_loss, logger):
                 if hasattr(exp_config, "tf_post"):
                     sample = {'image': data.squeeze(0), 'pred': pred.squeeze(0), 'mask': mask.squeeze(0)}
                     sample = exp_config.tf_post(sample)
-                    pred = sample['target'].unsqueeze(0)
+                    pred = sample['pred'].unsqueeze(0)
 
                 val_metrics.update(pred, target)
 
