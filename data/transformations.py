@@ -34,6 +34,12 @@ class ToTensor(object):
 
         sample['image'] = image
         sample['target'] = target
+
+        if "mask" in sample.keys():
+            mask = np.array(mask)
+            mask = torch.from_numpy(mask)
+            mask = mask.to(self.device)
+            sample['mask'] = mask
         return sample
 
 class ComposeTransforms:
@@ -669,6 +675,11 @@ class PadToDivisible(object):
         image, target = sample['image'], sample['target']
         image = self.pad(image).as_tensor()
         target = self.pad(target).as_tensor()
+
+        if "mask" in sample.keys():
+            mask = sample['mask']
+            mask = self.pad(mask).as_tensor()
+            sample['mask'] = mask
 
         sample['image'] = image
         sample['target'] = target
