@@ -36,6 +36,7 @@ class ToTensor(object):
         sample['target'] = target
 
         if "mask" in sample.keys():
+            
             mask = sample['mask']
             mask = np.array(mask)
             mask = torch.from_numpy(mask)
@@ -594,6 +595,12 @@ class CropForeground(object):
         image = self.crop(image, weight_map=weight_map, randomize=True)[0].as_tensor()
         target = self.crop(target, weight_map=weight_map, randomize=False)[0].as_tensor()
 
+        if 'mask' in sample.keys():
+            if len(sample['mask']) != 0:
+                mask = sample['mask']
+                mask = self.crop(mask, weight_map=weight_map, randomize=False)[0].as_tensor()
+                sample['mask'] = mask
+
         sample['image'] = image
         sample['target'] = target
         return sample
@@ -604,6 +611,10 @@ class CropForegroundCenter(object):
         self.target_label = target_label
         self.k_divisible = k_divisible
         self.margin = margin
+        
+
+
+
         def select_target_label(x):
             return x == self.target_label
         self.crop  = transforms.CropForegroundd(
@@ -616,6 +627,13 @@ class CropForegroundCenter(object):
             mode = "constant")
 
     def __call__(self, sample:dict) -> dict:
+        if "mask" in sample.keys():
+            if len(sample['mask']) != 0:
+                self.crop.keys = ['image', 'target', 'mask']
+            else:
+                self.crop.keys = ['image', 'target']
+
+
         sample = self.crop(sample)
         return sample
 
@@ -678,9 +696,10 @@ class PadToDivisible(object):
         target = self.pad(target).as_tensor()
 
         if "mask" in sample.keys():
-            mask = sample['mask']
-            mask = self.pad(mask).as_tensor()
-            sample['mask'] = mask
+            if len(sample['mask']) != 0:
+                mask = sample['mask']
+                mask = self.pad(mask).as_tensor()
+                sample['mask'] = mask
 
         sample['image'] = image
         sample['target'] = target
@@ -746,6 +765,12 @@ class CropSidesThreshold(object):
         image = crop(image, crop_borders)
         target = crop(target, crop_borders)
 
+        if "mask" in sample.keys():
+            if len(sample['mask']) != 0:
+                mask = sample['mask']
+                mask = crop(mask, crop_borders)
+                sample['mask'] = mask
+
         sample['image'] = image
         sample['target'] = target
         return sample
@@ -760,6 +785,12 @@ class MaskOutSidesThreshold(object):
         crop_borders = crop_till_threshold(image, threshold = 1.0, smooth = self.smooth)
         image = mask_out(image, crop_borders)
         target = mask_out(target, crop_borders)
+
+        if "mask" in sample.keys():
+            if len(sample['mask']) != 0:
+                mask = sample['mask']
+                mask = mask_out(mask, crop_borders)
+                sample['mask'] = mask
 
         sample['image'] = image
         sample['target'] = target
