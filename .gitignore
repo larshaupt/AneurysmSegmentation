@@ -18,3 +18,7 @@ jobs/brainseg_sweep-job.sh
 jobs/*
 results/data/*
 tests/*.csv
+tests/*.csv
+tests/old_files
+/*.sh
+.sh

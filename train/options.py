@@ -1,13 +1,8 @@
 import argparse
-from pathlib import Path
 import os
-from data import transformations, transformations_post
 import numpy as np
 import time
 import torch
-from train.metrics import *
-from train.losses import *
-from train.utils import *
 import monai
 from monai.networks.nets import UNet, AttentionUnet, UNETR, AHNet
 import json
@@ -17,14 +12,55 @@ from types import ModuleType
 import shutil
 import copy
 import pdb
-import torchio as tio
+
+from config import PATH_TO_DATASET, PATH_TO_PRETRAINED
+
+from train.metrics import *
+from train.losses import *
+from train.utils import *
+from data import transformations, transformations_post
+
+"""
+A class for handling the options and configuration for the main program.
+
+Parameters
+----------
+mode : str, optional
+    The mode of the program, either 'train' or 'test', by default 'train'
+verbose : bool, optional
+    Whether to print the output in a verbose mode, by default True
+config_file : str, optional
+    The configuration file, either a '.py' or a '.json' file, by default ''
+**kwargs : optional
+    Other arguments, will be stored as self.kwargs
+    
+Attributes
+----------
+kwargs : dict
+    Other arguments passed
+opt : Namespace
+    Namespace object for storing the options and configuration
+inp_dict : dict
+    Dictionary object for storing the options from the configuration file
+file_cont : str
+    String object for storing the content of the configuration file
+verbose : bool
+    Whether to print the output in a verbose mode
+config_file : str
+    The configuration file, either a '.py' or a '.json' file
+source : str
+    The source of the options and configuration, either 'py', 'json', or 'args'
+"""
+
 
 class Options:
 
+   
     def __init__(self, mode:str = 'train', 
                 verbose:bool = True, 
                 config_file:str = '',
                 **kwargs):
+
 
         self.kwargs = kwargs
         self.opt = Namespace()
@@ -58,9 +94,7 @@ class Options:
 
             self.load_from_py(self.config_file)
 
-            
-            if not hasattr(self.opt, 'criterion_metric_train'):
-                self.opt.criterion_metric_train = self.opt.criterion_metric
+    
             
 
 
@@ -81,6 +115,14 @@ class Options:
                 self.print_input_arguments()
 
     def print_input_arguments(self):
+        """
+        This method returns a string representation of the input arguments passed to the script. 
+        The string includes the options passed, the default value of each option, and the value of each option passed as an argument. 
+        If the source is 'py', the contents of the configuration file are also included in the returned string.
+
+        Returns:
+            str: A string representation of the input arguments.
+        """
 
         opt_dict = vars(self.opt)
         
@@ -99,9 +141,25 @@ class Options:
         return message
 
     def get_opt(self):
+        """
+        This method returns the options passed to the script as an object. 
+
+        Returns:
+            object: An object containing the options passed to the script.
+        """
         return self.opt
 
     def save_params(self, path):
+        """
+        This method saves the input arguments and the configuration file to a specified location as json.
+        
+        Args:
+            path (str): The location to save the input arguments and configuration file.
+
+        Returns:
+            None: This method does not return anything.
+        """
+
         def save_to_json(file:dict, path):
             with open(path, "w") as outfile:
                 json.dump(file, outfile)
@@ -119,110 +177,121 @@ class Options:
             print(e)
 
     def parse_arguments(self):
+        """
+        parse_arguments method is used to parse the command line arguments for the script.
 
-        self.parser = argparse.ArgumentParser(description="Script for training")
-        self.parser.add_argument("-ex", "--exp_path", type=str, default='', help="Path to experiment config file")
+        This method sets up the argument parser using the argparse module and adds various arguments for the script.
+        """
 
-        self.parser.add_argument('--project_name', default='USZ_opt', help='project name')
-        self.parser.add_argument('--verbose', '-v', action='store_true', help='verbose mode?')
-        self.parser.add_argument('--use_wandb', action='store_true', help='use wandb?')
-        self.parser.add_argument('--wandbProject', type=str, default='USZ_opt', help='name of the wandb project to use')
-        self.parser.add_argument('--sweep', action='store_true', help='is this a sweep?')
-        self.parser.add_argument('--tags', nargs='+', type=str, default=['simple'])
 
-        self.parser.add_argument('--num_workers', type=int, default=0, help='number of workers')
-        self.parser.add_argument('--debug',choices=('True','False'), default='False', help='Debugging')
+        self.parser = argparse.ArgumentParser(description="Script for training a model")
+        self.parser.add_argument("-ex", "--exp_path", type=str, default='', help="Path to the experiment configuration file")
 
-        self.parser.add_argument('--dataset', default='USZ_hdf5d2', help='dataset name')
-        self.parser.add_argument('--path_data', default='', help='path_data')
-        self.parser.add_argument('--extra_dataset', default='', help='path_data extra for training')
-        self.parser.add_argument('--path_split', default='', help='path_split')
-        self.parser.add_argument('--split_dict', default='k_fold_split2_val.json', help='split_dict')
-        self.parser.add_argument('--path_to_save_pretrained_models', default='/srv/beegfs02/scratch/brain_artery/data/training/pre_trained', help='path_to_save_pretrained_models')
-        self.parser.add_argument('--training_dataset', default='train', help='dataset name')
-        self.parser.add_argument('--validation_dataset', default='val', help='dataset name')
-        self.parser.add_argument('--test_dataset', default='test', help='dataset name')
-        self.parser.add_argument('--normalization', default='minmax', choices=['minmax', 'zscore'], help='Normalization strategy')
+        # Logging Parameters
+        self.parser.add_argument('--project_name', default='USZ_final', help='Name of the project')
+        self.parser.add_argument('--verbose', '-v', choices=("True","False"), default="True", help='Turn on verbose mode')
+        self.parser.add_argument('--use_wandb', choices=("True","False"), default="True", help='Use Weights & Biases for tracking')
+        self.parser.add_argument('--wandbProject', type=str, default='USZ_opt', help='Name of the Weights & Biases project')
+        self.parser.add_argument('--sweep', choices=("True","False"), default="True", help='Is this a sweep experiment?')
+        self.parser.add_argument('--tags', nargs='+', type=str, default=['simple'], help='Tags to categorize the experiment')
+
+        self.parser.add_argument('--num_workers', type=int, default=0, help='Number of worker processes to use')
+        self.parser.add_argument('--debug', choices=("True","False"), default="False", help='Turn on debugging mode')
+
+        # Data Parameters
+        self.parser.add_argument('--dataset', default='USZ_BrainArtery_bias', help='Dataset name')
+        self.parser.add_argument('--extra_dataset', default='', help='Path to extra data for training')
+        self.parser.add_argument('--split_dict', default='k_fold_split2_val.json', help='Split dictionary name')
+        self.parser.add_argument('--training_dataset', default='train', help='Name of the training dataset')
+        self.parser.add_argument('--validation_dataset', default='val', help='Name of the validation dataset')
+        self.parser.add_argument('--test_dataset', default='test', help='Name of the test dataset')
+        self.parser.add_argument('--normalization', default='minmax', choices=['minmax', 'zscore'], help='Data normalization strategy')
+
+        # Metrics and Validation
+        self.parser.add_argument('--grid_validation', choices=("True","False"), default="False", help='Use grid patching for validation')
+        self.parser.add_argument('--compute_mdice', choices=("True","False"), default="False", help='Compute multi-class Dice coefficient (needs more memory)')
+        self.parser.add_argument('--metric_train', type=str, default="reduced", help='Metric to use for training. Options: full, reduced, none')
+        self.parser.add_argument('--add_own_hausdorff', choices=("True","False"), default="False", help='Compute Hausdorff using extra memory')
+
+        self.parser.add_argument('--shuffle_train', choices=("True","False"), default="True", help='Shuffle training set')
+        self.parser.add_argument('--shuffle_validation', choices=("True","False"), default="False", help='Shuffle validation set')
+        self.parser.add_argument('--shuffle_test', choices=("True","False"), default="False", help='Shuffle test set')
+
+        # Batch Sizes and Folds
+        self.parser.add_argument('--batch_size_val', type=int, default=1, help='Batch size for validation')
+        self.parser.add_argument('--batch_size', type=int, default=2, help='Batch size for training')
+        self.parser.add_argument('--fold_id', type=int, default=0, help='ID of fold')
+        self.parser.add_argument('--num_training_files', type=int, default=-1, help='Number of training files')
+
+        self.parser.add_argument('--neighboring_vessels', choices=("True","False"), default="False", help='Include neighboring vessels')
+        self.parser.add_argument('--num_classes', type=int, default=1, help='Number of classes')
+        self.parser.add_argument('--collapse_classes', choices=("True","False"), default="False", help='Collapse multiple classes into one')
+        self.parser.add_argument('--pretrained_weights_dict', default='', help='Path to pretrained weights dictionary')
+
+        # Loss and Optimizers
+        self.parser.add_argument('--loss', default='weightedBCE', help='Loss function. Choices: weightedBCE, mixloss, softdiceloss, focalloss')
+        self.parser.add_argument('--learning_rate', type=float, default=1e-3, help='Initial learning rate')
+        self.parser.add_argument('--lr_scheduler', default='reduce', help='Learning rate scheduler')
+        self.parser.add_argument('--lambda_loss', type=float, default=1.0, help='Lambda loss')
+        self.parser.add_argument('--weight_decay', type=float, default=0.0, help='Weight decay')
+        self.parser.add_argument('--early_stopping', choices=("True","False"), default="False", help='Use early stopping')
+        self.parser.add_argument('--patience', type=int, default=50, help='Patience for the learning rate scheduler')
+        self.parser.add_argument('--number_of_epoch', type=int, default=300, help='Number of epochs')
+        self.parser.add_argument('--optimizer', type=str, default='adam', help='Optimizer (default: Adam)')
+        self.parser.add_argument('--update_loss_epoch', type=int, default=20, help='Update loss function every n epochs (default: 20)')
+
+        self.parser.add_argument('--positive_weight', type=float, default=100, help='Weight for positive samples (default: 100)')
+        self.parser.add_argument('--negative_weight', type=float, default=1, help='Weight for negative samples (default: 1)')
+        self.parser.add_argument('--target_label', type=int, default=4, help='Target label (default: 4)')
+
+        # Preprocesing and Data Augmentation
+        self.parser.add_argument('--patch_size_x', type=int, default=192, help='X patch size (default: 192)')
+        self.parser.add_argument('--patch_size_y', type=int, default=192, help='Y patch size (default: 192)')
+        self.parser.add_argument('--patch_size_z', type=int, default=96, help='Z patch size (default: 96)')
+        self.parser.add_argument('--validate_whole_vol', choices=("True","False"), default="False", help='Validate on whole volume (default: False)')
+        self.parser.add_argument('--train_whole_vol', choices=("True","False"), default="False", help='Train on whole volume (default: False)')
+        self.parser.add_argument('--only_foreground', choices=("True","False"), default="True", help='Train only on foreground (default: False)')
+        self.parser.add_argument('--foreground_probability', type=float, default=0.75, help='Foreground probability (default: 0.75)')
+        self.parser.add_argument('--augment_probability', type=float, default=0.1, help='Augmentation probability (default: 0.1)')
+        self.parser.add_argument('--patch_add', type=int, default=0, help='Add extra patches (default: 0)')
+        self.parser.add_argument('--patch_xy_add', type=int, default=0, help='Add extra patches in xy direction (default: 0)')
+        self.parser.add_argument('--crop_sides', choices=("True","False"), default="False", help='Crop sides (default: False)')
+        self.parser.add_argument('--rand_affine', choices=("True","False"), default="True", help='Random affine transformations (default: True)')
+        self.parser.add_argument('--norm_percentile', type=float, default=99.0, help='Percentile for normalization (default: 99.0)')
+        self.parser.add_argument('--rand_rotate', choices=("True","False"), default="False", help='Random rotation (default: False)')
+        self.parser.add_argument('--det_val_crop', choices=("True","False"), default="False", help='Determine if the validation set will be cropped deterministically or randomly')
         
-        self.parser.add_argument('--grid_validation', choices=('True','False'), default='False', help='Use grid patching for validation?')
-        self.parser.add_argument('--compute_mdice', choices=('True','False'), default='False', help='Compute Multiclass Dice? Needs more memory')
-        self.parser.add_argument('--metric_train', type=str, default="reduced", help='Options are full, reduced, none')
-        self.parser.add_argument('--add_own_hausdorff', choices=('True','False'), default='False', help='Compute our Hausdorff? Needs more memory')
+        # Postprocessing
+        self.parser.add_argument('--margin_crop', type=int, default=32, help='Margin for cropping the validation set')
+        self.parser.add_argument('--val_threshold_cc', type=int, default=0, help='Threshold value for connected components in validation set')
+        self.parser.add_argument('--val_threshold_cc_max', type=int, default=0, help='Max threshold value for connected components in validation set')
+        self.parser.add_argument('--val_threshold_data', type=float, default=0.0, help='Threshold value for data in validation set')
+        self.parser.add_argument('--apply_mask', choices=("True","False"), default="False", help='Determine if a mask should be applied')
 
-
-        self.parser.add_argument('--shuffle_train',choices=('True','False'), default='True', help='shuffle_train')
-        self.parser.add_argument('--shuffle_validation',choices=('True','False'), default='False', help='shuffle_validation')
-        self.parser.add_argument('--shuffle_test',choices=('True','False'), default='False', help='shuffle_test')
-
-        self.parser.add_argument('--batch_size_val', type=int, default=1, help='val. input batch size')
-        self.parser.add_argument('--batch_size', type=int, default=2, help=' input batch size')
-        self.parser.add_argument('--fold_id', type=int, default=0, help='fold id')
-        self.parser.add_argument('--num_training_files', type=int, default=-1, help='num_training_files')
-        self.parser.add_argument('--k_fold',choices=('True','False'), default='False', help='Doing k-fold?')
-        self.parser.add_argument('--k_fold_k', type=int, default = 5)
-        
-
-        self.parser.add_argument('--neighboring_vessels', choices=('True','False'), default='False', help='neighboring_vessels')
-        self.parser.add_argument('--num_classes', type=int, default=1, help=' number of classes')
-        self.parser.add_argument('--collapse_classes', choices=('True','False'), default='False', help='Wether to collapse multiple classes into one')
-        self.parser.add_argument('--pretrained_weights', default='', help='path to pretrained_weights')
-        self.parser.add_argument('--pretrained_weights_dict', default='', help='path of pretrained_weights')
-
-        self.parser.add_argument('--loss', default='weightedBCE', help='loss')
-        self.parser.add_argument('--learning_rate', type=float, default=1e-3, help=' initial learning rate')
-        self.parser.add_argument('--lr_scheduler', default='reduce', help='Which learning rate scheduler')
-        self.parser.add_argument('--lambda_loss', type=float, default=1.0, help=' lambda loss')
-        self.parser.add_argument('--weight_decay', type=float, default=0.0, help=' lambda loss')
-        self.parser.add_argument('--early_stopping',choices=('True','False'), default='False', help='Doing early stopping')
-        self.parser.add_argument('--patience', type=int, default=50, help=' patience')
-        self.parser.add_argument('--number_of_epoch', type=int, default=300, help=' number of epochs')
-        self.parser.add_argument('--optimizer', type=str, default='adam', help=' Optimizer')
-        self.parser.add_argument('--update_loss_epoch', type=int, default='20', help=' Update Loss function every n epochs')
-
-        
-        self.parser.add_argument('--positive_weight', type=float, default=100, help=' positive_weight')
-        self.parser.add_argument('--negative_weight', type=float, default=1, help=' negative_weight')
-        self.parser.add_argument('--target_label', type=int, default=4, help=' target_label')
-
-        
-        self.parser.add_argument('--patch_size_x', type=int, default=192, help=' x patch size')
-        self.parser.add_argument('--patch_size_y', type=int, default=192, help=' y patch size')
-        self.parser.add_argument('--patch_size_z', type=int, default=96, help=' z patch size')
-        self.parser.add_argument('--validate_whole_vol', choices=('True','False'), default='False')
-        self.parser.add_argument('--train_whole_vol', choices=('True','False'), default='False')
-        self.parser.add_argument('--only_foreground',choices=('True','False'), default='False')
-        self.parser.add_argument('--foreground_probability', type=float, default=0.75)
-        self.parser.add_argument('--extra_cropping',choices=('True','False'), default='False')
-        self.parser.add_argument('--augment_probability', type=float, default=0.1)
-        self.parser.add_argument('--patch_add', type=int, default=0)
-        self.parser.add_argument('--patch_xy_add', type=int, default=0)
-        self.parser.add_argument('--crop_sides',choices=('True','False'), default='False')
-        self.parser.add_argument('--rand_affine',choices=('True','False'), default='True')
-        self.parser.add_argument('--norm_percentile', type=float, default=99.0)
-        self.parser.add_argument('--rand_rotate',choices=('True','False'), default='False')
-
-
-        self.parser.add_argument('--det_val_crop',choices=('True','False'), default='False')
-        self.parser.add_argument('--margin_crop', type=int, default=32)
-        self.parser.add_argument('--val_threshold_cc',type = int, default=0)
-        self.parser.add_argument('--val_threshold_cc_max',type = int, default=0)
-        self.parser.add_argument('--val_threshold_data',type = float, default=0.0)
-        self.parser.add_argument('--apply_mask',choices=('True','False'), default='False')
-
-        self.parser.add_argument('--model_name', type=str, default='UNet', help='name of model')
-        self.parser.add_argument('--num_blocks', type=int, default=5)
-        self.parser.add_argument('--dropout', type=float, default=0.0, help='dropout rate')
-
+        # Training Model
+        self.parser.add_argument('--model_name', type=str, default='UNet', help='Name of the model')
+        self.parser.add_argument('--num_blocks', type=int, default=5, help='Number of blocks in the model')
+        self.parser.add_argument('--dropout', type=float, default=0.0, help='Dropout rate for the model')
+        self.parser.add_argument('--update_layers', choices=("", "all", "decoder", "norm"), default="all", help='The layers to be updated during training. Choices: all, decoder, norm')
 
         self.inp = self.parser.parse_args()
         
 
-    def interpret_params(self):
+    def cast_string_to_bool(self):
+        """
+        Convert string values to boolean for specified attributes in `self.opt`
+        
+        If an attribute is a string, it will be evaluated and set as a boolean value in `self.opt`.
+        """
 
-        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "extra_cropping" , "crop_sides" , "rand_affine", "rand_rotate", "neighboring_vessels", "det_val_crop", "apply_mask", "add_own_hausdorff"]:
+        for el in ["validate_whole_vol", "debug"  , "grid_validation" , "compute_mdice"  , "shuffle_train" , "shuffle_validation" , "shuffle_test" , "k_fold" , "collapse_classes" , "early_stopping" , "train_whole_vol" , "only_foreground" , "crop_sides" , "rand_affine", "rand_rotate", "neighboring_vessels", "det_val_crop", "apply_mask", "add_own_hausdorff"]:
             if hasattr(self.opt, el):
                 if isinstance(vars(self.opt)[el], str):
                     vars(self.opt)[el] = eval(vars(self.opt)[el])
+
+    def interpret_params(self):
+
+        self.cast_string_to_bool()
         #################### GENERAL PARAMETERS ####################
         timestamp = int(time.time())
         self.opt.experiment_name = '%s_sweep_%d'%(self.opt.dataset, timestamp)
@@ -230,24 +299,16 @@ class Options:
         self.opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         if self.opt.dataset.lower() == 'adam': # QUick fix for parameters, all case of ADAM point to the correct ADAM dataset
             self.opt.dataset = 'ADAM'
-        if self.opt.path_data == "":
-            self.opt.path_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/%s/data/'%(self.opt.dataset)
-        if self.opt.path_split == "":
-            self.opt.path_split = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/%s/%s'%(self.opt.dataset, self.opt.split_dict)
 
-        path_to_pre_trained_old = self.opt.path_to_save_pretrained_models
-        self.opt.path_to_save_pretrained_models = os.path.join(self.opt.path_to_save_pretrained_models ,self.opt.experiment_name)
+        self.opt.path_data = os.path.join(PATH_TO_DATASET, self.opt.dataset, 'data/')
+        self.opt.path_split = os.path.join(PATH_TO_DATASET, self.opt.dataset, self.opt.split_dict)
+
+        self.opt.path_to_save_pretrained_models = os.path.join(PATH_TO_PRETRAINED ,self.opt.experiment_name)
 
         if self.opt.extra_dataset != "":
-            self.opt.path_data_extra = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/%s/data/'%(self.opt.extra_dataset)
+            self.opt.path_data_extra = os.path.join(PATH_TO_DATASET, self.opt.extra_dataset, 'data/')
         else:
             self.opt.path_data_extra = None
-        if not hasattr(self.opt, 'rand_affine'):
-            self.opt.rand_affine = False
-        if not hasattr(self.opt, 'grid_validation'):
-            self.opt.grid_validation = False
-        if self.opt.sweep:
-            self.opt.name = self.opt.name + '_' + os.environ['SLURM_ARRAY_TASK_ID']
 
         if self.opt.pretrained_weights_dict != "" and self.opt.pretrained_weights_dict != None :
             weights_dict = pd.read_csv(self.opt.pretrained_weights_dict)
@@ -257,9 +318,12 @@ class Options:
             fold = int(weights_name[-ind:])
             assert fold == self.opt.fold_id, print(fold, self.opt.fold_id)
 
-            self.opt.pretrained_weights = os.path.join(path_to_pre_trained_old, name, str(fold), 'best_model.pth')
+            self.opt.pretrained_weights = os.path.join(PATH_TO_PRETRAINED, name, str(fold), 'best_model.pth')
+        else:
+            self.opt.pretrained_weights = ""
 
         #################### LABEL PROCESSING ####################
+        # Need to save this as is still used for the transformations
         old_target_label = self.opt.target_label
 
         if self.opt.num_classes == 1:
@@ -297,11 +361,11 @@ class Options:
 
         patch_size_train = (self.opt.patch_size_x, self.opt.patch_size_y, self.opt.patch_size_z)
 
+        # Training Set Tranformations
         self.opt.tf_train = transformations.ComposeTransforms([
                 transformations.ToTensor(),  
                 transformations.CropSidesThreshold() if self.opt.crop_sides else None,
                 None if self.opt.train_whole_vol else transformations.CropForeground(patch_size_train, label=old_target_label) if self.opt.only_foreground else transformations.CropForegroundBackground(patch_size_train,prob_foreground=self.opt.foreground_probability, label=self.opt.target_label),
-                transformations.CropRandom((np.array(patch_size_train)/2).astype(int), prob= self.opt.augment_probability) if self.opt.extra_cropping else None,
                 transformations.PadToDivisible(16),
                 transformations.RandAffine() if self.opt.rand_affine else None,
                 transformations.RandomRotate90(prob=self.opt.augment_probability) if (patch_size_train.count(patch_size_train[0]) == len(patch_size_train) and self.opt.rand_rotate) else None,
@@ -311,6 +375,7 @@ class Options:
                 label_transform
                 ], debug=False)
 
+        # Validation Set Tranformations
         self.opt.tf_val = transformations.ComposeTransforms([
                 transformations.ToTensor(),
                 transformations.CropSidesThreshold() if self.opt.crop_sides else None,
@@ -319,12 +384,14 @@ class Options:
                 label_transform,
                 ], debug=False)
 
+        # Test Set Tranformations
         self.opt.tf_test = transformations.ComposeTransforms([
                 transformations.ToTensor(),
                 transformations.PadToDivisible(16),
                 label_transform
                 ], debug=False)
 
+        # Postprocessing Transformations
         self.opt.tf_post = transformations.ComposeTransforms([
             transformations_post.MaskOutSidesThreshold() if self.opt.crop_sides else None,
             transformations_post.Mask_Concentation(threshold=0.01) if self.opt.apply_mask else None,
@@ -384,17 +451,28 @@ class Options:
         else: 
             raise NotImplementedError(f'Loss {self.opt.loss} is not implemented')
 
+        #################### VOXEL SIZE ####################
+
+        if "111" in self.opt.dataset:
+            self.opt.voxel_size = (1.0,1.0,1.0)
+        elif "666" in self.opt.dataset: 
+            self.opt.voxel_size = (0.6,0.6,0.6)
+        else:
+            self.opt.voxel_size = (0.3,0.3,0.6)
+        
         #################### METRICS ####################
+
         if self.opt.num_classes == 1:
             self.opt.criterion_metric =  {
                     "Dice":DiceMetric(),
                     "Recall": RecallMetric(),
                     "Precision": PrecisionMetric(),
                     "Hausdorff": HausDorffMetricMonai(percentile=99),
-                    "VolSimilarity": VolumetricSimilarityMetric()
+                    "VolSimilarity": VolumetricSimilarityMetric(),
+                    "HausdorffOurs": HausDorffMetric(percentile=95, voxel_size=self.opt.voxel_size) if self.opt.add_own_hausdorff else None,
                     }
         else:
-            voxel_size = (1.0,1.0,1.0) if "111" in self.opt.dataset else (0.3,0.3,0.6)
+            
             self.opt.criterion_metric =  {                    
                 "Dice": TargetLabelMetric(DiceMetric(), new_target_label),
                 "Recall": TargetLabelMetric(RecallMetric(), new_target_label),
@@ -402,14 +480,12 @@ class Options:
                 "Hausdorff": TargetLabelMetric(HausDorffMetricMonai(percentile=99), new_target_label),
                 "VolSimilarity": TargetLabelMetric(VolumetricSimilarityMetric(), new_target_label),
                 "MDice": MultiClassDiceMetric(include_background=True) if self.opt.compute_mdice else None,
-                "HausdorffOurs": TargetLabelMetric(HausDorffMetric(percentile=95, voxel_size = voxel_size), new_target_label) if self.opt.add_own_hausdorff else None
+                "HausdorffOurs": TargetLabelMetric(HausDorffMetric(percentile=95, voxel_size = self.opt.voxel_size), new_target_label) if self.opt.add_own_hausdorff else None
                     }
 
 
-
-        if not hasattr(self.opt, 'metric_train'):
-            self.opt.criterion_metric_train = self.opt.criterion_metric      
-        elif self.opt.metric_train.lower() == "full":
+        # Sets the training metrics
+        if self.opt.metric_train.lower() == "full":
             self.opt.criterion_metric_train = self.opt.criterion_metric   
         elif self.opt.metric_train.lower() == "reduced":
             reduced_metrices = ["Dice", "Recall", "Precision"]
@@ -419,13 +495,9 @@ class Options:
 
 
 
-
-
         #################### MODEL ####################
-        if hasattr(self.opt, 'num_blocks'):
-            channels = [int(2**(4+n)) for n in range(self.opt.num_blocks)]
-        else:
-            channels = (16, 32, 64, 128, 256)
+        # sets the channel size, defaults to 5 channels with sizes (16, 32, 64, 128, 256)
+        channels = [int(2**(4+n)) for n in range(self.opt.num_blocks)]
 
         if self.opt.model_name.lower() == 'unet':
             self.opt.model = UNet(
@@ -473,17 +545,58 @@ class Options:
         
         #################### OPTIMIZER ####################
 
+        if self.opt.update_layers == "norm":
+            update_parameters = self._get_norm_parameters(self.opt.model)
+        elif self.opt.update_layers == "decoder":
+            update_parameters = self._get_decoder_parameters(self.opt.model)
+        else:
+            update_parameters = self.opt.model.parameters()
+
         if self.opt.optimizer.lower() == 'adamw':
-            self.opt.optimizer = torch.optim.AdamW(self.opt.model.parameters(), lr = self.opt.learning_rate, weight_decay = self.opt.weight_decay)
+            self.opt.optimizer = torch.optim.AdamW(update_parameters, lr = self.opt.learning_rate, weight_decay = self.opt.weight_decay)
         elif self.opt.optimizer.lower() == 'adam':
-            self.opt.optimizer = torch.optim.Adam(self.opt.model.parameters(), lr = self.opt.learning_rate, weight_decay = self.opt.weight_decay)
+            self.opt.optimizer = torch.optim.Adam(update_parameters, lr = self.opt.learning_rate, weight_decay = self.opt.weight_decay)
         else:
             raise NotImplementedError(f'Optimizer {self.opt.optimizer} is not implemented')
 
+    def _get_norm_parameters(self, model) -> list:
+        """Returns the parameters for the normalization layers in the model.
+        Args:
+            model: The model to get the normalization layers from.
+        Returns:
+            A list of dictionaries containing the parameters for the normalization layers.
+        """
+        norm_params = []
+        for name, param in model.named_parameters():
+            if 'adn' in name:
+                norm_params.append(param)
+        return norm_params
 
+    def _get_decoder_parameters(self, model) -> list:
+        """Returns the parameters for the decoder layers in the model.
+        Args:
+            model: The model to get the decoder layers from.
+        Returns:
+            A list of dictionaries containing the parameters for the decoder layers.
+        """
+        decoder_params = []
+        for mod in model.modules():
+            if 'ConvTranspose3d' in type(mod).__name__:
+                decoder_params.extend(list(mod.parameters()))
+        return decoder_params
             
-
     def load_from_py(self, config_file):
+
+        """
+        Load the configuration file in Python format and store it in a Namespace object.
+
+        Args:
+            config_file (str): The file path to the configuration file.
+
+        Returns:
+            None
+        """
+
         config_module = config_file.split('/')[-1].rstrip('.py')
         
         self.opt = SourceFileLoader(config_module, config_file).load_module() # exp_config stores configurations in the given config file under experiments folder.
@@ -492,7 +605,19 @@ class Options:
         with open(self.config_file, 'r') as f:
             self.file_cont = f.read()
 
+        self.replace_missing_arguments()
+
     def load_from_json(self, config_file):
+
+        """
+        Load the configuration file in JSON format, update it with `kwargs` if provided, and store it in a Namespace object.
+
+        Args:
+            config_file (str): The file path to the configuration file.
+
+        Returns:
+            None
+        """
         
         with open(config_file, 'r') as infile:
             opt_dict = json.load(infile)
@@ -503,36 +628,50 @@ class Options:
             self.opt = Namespace(**opt_dict)
         self.file_cont = str(self.opt)
 
+        self.replace_missing_arguments()
+
+    def replace_missing_arguments(self):
+        """
+        Replace missing arguments with default values.
+        """
+
         if not hasattr(self.opt, 'split_dict'):
             self.opt.split_dict = 'k_fold_split2_val.json'
-
         if not hasattr(self.opt, 'rand_rotate'):
             self.opt.rand_rotate = False
-
         if not hasattr(self.opt, 'neighboring_vessels'):
             self.opt.neighboring_vessels = False
-            
         if not hasattr(self.opt, 'det_val_crop'):
             self.opt.det_val_crop = False
-
         if not hasattr(self.opt, 'val_threshold_data'):
             self.opt.val_threshold_data = 1.0
-
         if not hasattr(self.opt, 'val_threshold_cc'):
             self.opt.val_threshold_cc = 100
-
         if not hasattr(self.opt, 'pretrained_weights_dict'):
             self.opt.pretrained_weights_dict = ""
-
         if not hasattr(self.opt, 'apply_mask'):
             self.opt.apply_mask = False
         if not hasattr(self.opt, 'val_threshold_cc_max'):
             self.opt.val_threshold_cc_max = -1
         if not hasattr(self.opt, 'add_own_hausdorff'):
             self.opt.add_own_hausdorff = False
-        
         if not hasattr(self.opt, 'normalization'):
             self.opt.normalization = 'minmax'
+        if not hasattr(self.opt, 'rand_affine'):
+            self.opt.rand_affine = False
+        if not hasattr(self.opt, 'grid_validation'):
+            self.opt.grid_validation = False
+        if not hasattr(self.opt, 'num_blocks'):
+            self.opt.num_blocks = 5
+        if not hasattr(self.opt, 'metric_train'):
+            self.opt.metric_train = "reduced" 
             
     def load_from_args(self):
+        """
+        Load the configuration from command-line arguments and store it in a Namespace object.
+
+        Returns:
+            None
+        """
+
         self.opt = copy.deepcopy(self.inp)

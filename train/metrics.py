@@ -185,7 +185,7 @@ class MetricesStruct():
                                 print(f"Error {e} in {name} metric. Trying again.")
                             else:
                                 print(f"Error {e} in {name} metric. Aborting.")
-                                raise e
+                                score=np.NAN
                             
 
                     if self.debug:
