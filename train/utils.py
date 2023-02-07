@@ -7,6 +7,7 @@ from torch import Tensor
 import pandas as pd
 import os
 import pdb
+import scipy
 
 from importlib.machinery import SourceFileLoader
 
@@ -23,6 +24,9 @@ def create_directory(path):
         os.makedirs(path)
         
 def load_split(path_dict:str, fold_id:int, split:str = "") -> dict|list:
+    if not os.path.exists(path_dict):
+        print(path_dict)
+        raise FileNotFoundError("Split file not found. Possible splits are: "+ str(os.listdir(os.path.dirname(path_dict))))
     split_dict_df = pd.read_json(path_dict)
     fold_split = split_dict_df[fold_id]
     empty_dict = {'image':[],'target':[]}
@@ -158,6 +162,7 @@ class Predictor:
         self.num_classes = []
         print(self.exp_names)
         self.exp_names = [exp_n if exp_n[-2] != '_' else exp_n[:-2] for exp_n in self.exp_names]
+         
 
         new_exp_names = []
         for exp_name in self.exp_names:
@@ -166,6 +171,7 @@ class Predictor:
                 new_exp_names.append(exp_name)
         self.exp_names = new_exp_names
         self.standard_exp_config = self.models[self.exp_names[0]][1]
+        self.standart_voxel_size = self.standard_exp_config.voxel_size
 
     def load_model(self, exp_name):
         
@@ -188,7 +194,23 @@ class Predictor:
     def predict(self, data, exp_name, postprocessing=False, softmax=True):
         if not exp_name in self.models.keys():
             raise ValueError(f'Experiment {exp_name} not loaded. Please load it first.')
+
+
         (model,exp_config) = self.models[exp_name]
+
+        _needs_resampling = not all([st_vox == vox for st_vox, vox in zip(exp_config.voxel_size,self.standart_voxel_size)]) 
+
+        if _needs_resampling:
+            old_size = data.shape[-3:]
+            new_size = [int(el*st_vox/vox) for el,vox,st_vox in zip(old_size, exp_config.voxel_size, self.standart_voxel_size)]
+            
+            resample = torch.nn.Upsample(size=new_size, mode='trilinear', align_corners=True)
+            data  = resample(data)
+            margin = [(16 - (dim % 16))%16 for dim in data.shape[2:]]
+            data = torch.nn.functional.pad(data, (0,margin[2],0,margin[1],0,margin[0]))
+
+
+
         with torch.no_grad():
             model = model.to(self.device)
             data = data.to(self.device)
@@ -201,6 +223,11 @@ class Predictor:
         if postprocessing:
             pred = self.postprocess(pred, data, exp_config)
         
+        if _needs_resampling:
+            indices = [size - ma for size, ma in zip(pred.shape[-3:], margin)]
+            pred = pred[:,:,0:indices[0],0:indices[1],0:indices[2]]
+            pred = torch.nn.Upsample(size=old_size, mode='trilinear')(pred)
+            
         return pred
 
     def predict_all(self, data):

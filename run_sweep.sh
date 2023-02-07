@@ -1,12 +1,12 @@
 #!/bin/bash
 
-NAME="brainseg_sweep"
-SWEEP_ID="57wuc2cy"
+NAME="Loss_Sweep_7"
+SWEEP_ID="y3cn9n4s"
 WANDBPROJECT="USZ_final"
 NGPUS=1
 JOB_FILE="$NAME-job.sh"
-MAX_JOBS=3
-NRUNS=6
+MAX_JOBS=7
+NRUNS=5
 MEM=32G
 CPUS=4
 
@@ -14,9 +14,10 @@ CPUS=4
 cat << EOT > "jobs/$JOB_FILE"
 #!/bin/bash
 
-#SBATCH --output=/scratch_net/biwidl311/lhauptmann/segmentation_3D/sbatch_logs/TRAIN-%x.%A.%a.out
+
 #SBATCH --gres=gpu:$NGPUS
 #SBATCH --job-name=$NAME
+#SBATCH --output=sbatch_logs/job-name-%x.%A.%a.out
 #SBATCH --mem-per-cpu=$MEM
 #SBATCH --cpus-per-task=$CPUS
 #SBATCH --mail-type=END,FAIL

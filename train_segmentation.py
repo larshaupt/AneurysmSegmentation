@@ -13,24 +13,37 @@ from train.options import Options
 # %%
 
 def main(exp_config, exp_cont = ""):
-    train_logs = []
-    
-    if exp_config.k_fold: # doing k-fold cv
-        for fold_id in range(exp_config.k_fold_k):
-            exp_config.fold_id = fold_id
-            log = train(exp_config, fold_id = fold_id,  exp_cont = exp_cont)
-            train_logs.append(log)
 
-    else:   # not doing k-fold cv
-        log = train(exp_config, fold_id = exp_config.fold_id,  exp_cont = exp_cont)
+    """Main function that trains a segmentation network.
+
+    Args:
+    - exp_config (object): object containing all configuration parameters for training
+    - exp_cont (str, optional): string representation of input arguments. Default value is an empty string.
+
+    Returns:
+    None
+    """
+    
+    log = train(exp_config, fold_id = exp_config.fold_id,  exp_cont = exp_cont)
         
-    scores = [el.get_best_score("val_Dice", max=True, return_epoch=False) for el in train_logs]
-    best_epochs = [el.get_best_score("val_Dice", max=True, return_epoch=True)[1] for el in train_logs]
+    scores = log.get_best_score("val_Dice", max=True, return_epoch=False)
+    best_epochs = log.get_best_score("val_Dice", max=True, return_epoch=True)[1]
     print("Dice: ", scores, " Best Epochs: ", best_epochs)
-    print("Mean Dice", np.mean(scores))
+    print("Mean Dice", scores)
 
 
 def train(exp_config, fold_id, exp_cont = ""):
+    
+    """Trains a segmentation network.
+
+    Args:
+    - exp_config (object): object containing all configuration parameters for training
+    - fold_id (int): fold identifier used to load a specific split of data
+    - exp_cont (str, optional): string representation of input arguments. Default value is an empty string.
+
+    Returns:
+    - train_log (object): object containing training log information
+    """
 
     experiment_name = f"{exp_config.experiment_name}_{fold_id}"
 
