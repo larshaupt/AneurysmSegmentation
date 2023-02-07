@@ -16,3 +16,5 @@ data/__pycache__/*
 USZ_BrainArtery.code-workspace
 jobs/brainseg_sweep-job.sh
 jobs/*
+results/data/*
+tests/*.csv
