@@ -665,6 +665,8 @@ class Options:
             self.opt.num_blocks = 5
         if not hasattr(self.opt, 'metric_train'):
             self.opt.metric_train = "reduced" 
+        if not hasattr(self.opt, 'update_layers'):
+            self.opt.update_layers = "all"
             
     def load_from_args(self):
         """
