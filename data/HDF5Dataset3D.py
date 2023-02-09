@@ -9,14 +9,33 @@ import pdb
 import h5py
 import time
 import torch
+import types
 
 class HDF5Dataset3D(data.Dataset):
     """
-    Input params:
-        path: Path to the folder containing the dataset (multiple npy files).
-        transform: PyTorch transform to apply to every data instance (default = None).
+    The HDF5Dataset3D class inherits from the PyTorch data.Dataset class and is used for loading 3D datasets from HDF5 files. The main function of this class is the init function, which sets up the path and the transform to be applied to the data.
+
+    init inputs:
+
+    exp_config :unknown, not mentioned in the code
+    path: path to the folder containing the dataset (multiple HDF5 files)
+    data_names: list of names for images and corresponding labels, default is []
+    transform: PyTorch transform to apply to every data instance, default is None
+    reduce_len: used for debugging, used in len, default is -1
+    mask_path: path to the folder containing mask, default is empty string ""
+    norm_percentile: Percentile value for normalization, default is 99
+    normalization: normalization type to be applied, can be 'minmax' or 'z' or 'zscore' default is 'minmax'
+
+    
+    The class also has two additional function
+
+    getitem: This function is called by the PyTorch DataLoader to get a specific item at an index. It loads the image and target at the given index and returns them.
+    len: returns the number of samples in the dataset.
+    note:
+    This class also uses pandas library for loading csv file that have statistics about the data. this file should exist in the path with the name 'file_dict.csv'
     """
-    def __init__(self, exp_config, path, data_names = [], transform = None, reduce_len = -1, mask_path="", norm_percentile = 99, normalization = 'minmax'):
+    def __init__(self, 
+        exp_config, path:str, data_names:list = [], transform = None, reduce_len:int = -1, mask_path:str="", norm_percentile:int = 99, normalization:str = 'minmax'):
         super().__init__()
         self.transform = transform
         self.main_path = path
@@ -26,10 +45,11 @@ class HDF5Dataset3D(data.Dataset):
         self.normalization = normalization
 
 
+        # For debugging
         if self.reduce_len != -1:
             print('DataLoader: Reduced Number of samples to %i'%(self.reduce_len))
 
-
+        ################ Data Paths ###################
         if len(data_names) == 0:
             self.image_paths = [self.main_path + s for s in os.listdir(self.main_path) if ('_x' in s)]
             self.target_paths = [self.main_path + s for s in os.listdir(self.main_path) if ('_y' in s)]
@@ -70,7 +90,7 @@ class HDF5Dataset3D(data.Dataset):
                 self.data_mean, self.data_var = [],[]
 
     def __getitem__(self, index):
-
+        ################ Data Loading ###################
         reader_image = h5py.File(self.image_paths[index], 'r')
         reader_target = h5py.File(self.target_paths[index], 'r')
         
@@ -87,43 +107,43 @@ class HDF5Dataset3D(data.Dataset):
         patient_name_current = os.path.basename(self.image_paths[index])[:-3]
         ################ Normalization ###################
         # scales the values between 0 and 1 
-        index_patient = np.where(self.patient_names == patient_name_current)[0][0]
+        index_patient = np.where(self.patient_names == patient_name_current)[0]
+        if len(index_patient) == 0:
+            index_patient = -1
+        else:
+            index_patient = index_patient[0]
+
+        if index_patient != -1:
+            min_value = self.data_min[index_patient]
+            max_value = self.data_max[index_patient]
 
         # Z Score Normalization
         if self.normalization == 'z' or self.normalization == 'zscore':
-            if len(self.patient_names) != 0:
+            if index_patient != -1:
                 mean = self.data_mean[index_patient]
                 var = self.data_var[index_patient]
             else:
                 mean = np.mean(x)
                 var = np.var(x)
-            x = (x  - mean)/ np.sqrt(var)
+            x = self.normalize_zscore(x,mean,var)
             
         # Min Max Normalization
         else:
-            if len(self.patient_names) != 0:
-                
-                min_value = self.data_min[index_patient]
-            else:
-                min_value = np.min(x)
-
             if self.norm_perc == 99:
-                if len(self.patient_names) != 0:
+                if index_patient != -1:
                     max_scale = self.data_99_percentile[index_patient]
                 else:
                     max_scale = np.percentile(x, 99)
 
             elif self.norm_perc == 100:
-                if len(self.patient_names) != 0:
-                    max_scale = self.data_max[index_patient]
-                else:
-                    max_scale = np.max(x)
+                max_scale = max_value
 
             else:
                 max_scale = np.percentile(x, self.norm_perc)
             x = self.normalize_min_max(x,min_value,max_scale)
-        
-        norm_params = np.array([self.data_min, self.data_max])
+
+        ################ Preprocessing ###################
+        norm_params = np.array([max_value, min_value])
 
         x = x.astype(np.float32)
         y = y.astype(np.uint8)
@@ -133,11 +153,10 @@ class HDF5Dataset3D(data.Dataset):
         if y.ndim == 3:
             y = np.expand_dims(y, axis=0)
 
-
         sample = {'image': x, 'target': y, 'params': norm_params, 'mask': mask, 'name': patient_name_current}
 
         if self.transform != None:
-            
+            # Augmentations
             sample = self.transform(sample)
 
         return sample['image'], sample['target'], sample['mask'], norm_params, patient_name_current
@@ -146,11 +165,11 @@ class HDF5Dataset3D(data.Dataset):
         img_normalized = (img - min_val) / (max_val - min_val)
 
         return img_normalized
-    
-    # def apply_histeq(self, x):
-    #     x_histeq = exposure.equalize_hist(x)
 
-    #     return x_histeq
+    def normalize_zscore(self, img, mean, var):
+        img_normalized = (img - mean) / var
+
+        return img_normalized
 
     def __len__(self):
         
