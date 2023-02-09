@@ -94,9 +94,26 @@ def get_single_data_loader_hdf53d(exp_config,
         if extra_data_names == None:
             x,y = preprocessing_utils.read_data_names(extra_train_set,keep_ending=False)
             extra_data_names = [{'image': x_el, 'target': y_el} for x_el, y_el in zip(x,y)]
-        ds = HDF5Dataset3D.HDF5Dataset3D_multiple(exp_config, path_data, data_names,mask_path=mask_path, path_2 = extra_train_set, data_names_2=extra_data_names, transform = tf,reduce_len = reduce_number,norm_percentile = norm_percentile, normalization = normalization)
+        ds = HDF5Dataset3D.HDF5Dataset3D_multiple(
+                        exp_config = exp_config, 
+                        path = path_data, 
+                        data_names = data_names, 
+                        path_2 = extra_train_set, 
+                        data_names_2 = extra_data_names, 
+                        transform = tf,
+                        reduce_len = reduce_number,
+                        norm_percentile = norm_percentile, 
+                        normalization = normalization)
     else:
-        ds = HDF5Dataset3D.HDF5Dataset3D(exp_config, path_data, data_names, tf, reduce_number, norm_percentile = norm_percentile, mask_path=mask_path, normalization = normalization)
+        ds = HDF5Dataset3D.HDF5Dataset3D(
+                        exp_config = exp_config, 
+                        path = path_data, 
+                        data_names = data_names, 
+                        transform = tf, 
+                        reduce_len = reduce_number, 
+                        norm_percentile = norm_percentile, 
+                        mask_path=mask_path, 
+                        normalization = normalization)
     loader = torch.utils.data.DataLoader(ds, batch_size = batch_size, shuffle = True, num_workers = min(num_workers, batch_size), pin_memory = True)
 
     return loader
