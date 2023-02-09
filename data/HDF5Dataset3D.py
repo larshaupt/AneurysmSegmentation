@@ -163,8 +163,8 @@ class HDF5Dataset3D(data.Dataset):
 
 class HDF5Dataset3D_multiple(HDF5Dataset3D):
 
-    def __init__(self, exp_config, path, data_names = [], path_2 = None, data_names_2 = None, transform = None, reduce_len = -1, norm_percentile = 99 ):
-        super().__init__(exp_config, path, data_names, transform, reduce_len)
+    def __init__(self, exp_config, path, data_names = [], path_2 = None, data_names_2 = None, transform = None, reduce_len = -1, norm_percentile = 99,  normalization = 'minmax'):
+        super().__init__(exp_config = exp_config, path = path, data_names = data_names,transform =  transform,reduce_len =  reduce_len, norm_percentile = norm_percentile, normalization = normalization)
 
         self.path_2 = path_2
 
