@@ -12,9 +12,9 @@ import pandas as pd
 # Write all important paths for read/save here
 # if you don't know them, just ommit them (might evoke some errors)
 path_to_repo = "/scratch_net/biwidl311/lhauptmann/segmentation_3D"
-path_to_data = "/usr/bmicnas01/data-biwi-01/bmicdatasets/Sharing/ADAM_Challenge/ADAM_release_subjs/"
-path_to_external_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/ADAM111/data'
-path_to_exterinal_header = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/ADAM/header'
+path_to_data = "/scratch_net/biwidl311/lhauptmann/Lausanne_ex"
+path_to_external_data = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/Lausanne/data'
+path_to_exterinal_header = '/usr/bmicnas01/data-biwi-01/bmicdatasets/Processed/USZ_BrainArtery/Lausanne/header'
 
 import sys
 sys.path.append(os.path.join(path_to_repo, "src/utils/"))
@@ -23,10 +23,11 @@ sys.path.append(os.path.join(path_to_repo, "src/utils/"))
 # %%
 # Iterate through all folders, and save names of files
 MRI_file_list = []
-pre = "pre"
+pre = ""
 
 for mri_file_name in os.listdir(path_to_data):
     mri_file_path = os.path.join(path_to_data, mri_file_name)
+
     if os.path.isdir(mri_file_path) and not mri_file_name.startswith('.'):
         
         MRI_file = {'name': mri_file_name,
@@ -52,11 +53,10 @@ for mri_file_name in os.listdir(path_to_data):
 # sort the list alphabetically
 MRI_file_list = np.array(MRI_file_list)
 MRI_file_list = MRI_file_list[np.argsort([el['name'] for el in MRI_file_list])]             
-        
 
 # %%
 
-voxel_size = (1.0, 1.0, 1.0)
+voxel_size = (0.3,0.3,0.6)
 
 
 # %%

@@ -105,7 +105,7 @@ def make_predictions(
     print(scores_df.to_string())
     if save:
         scores_df.to_csv(model_scores_path)
-    scores_df.to_csv(predictor.get_all_exp_names_comp() + postfix + ".csv")
+    #scores_df.to_csv(predictor.get_all_exp_names_comp() + postfix + ".csv")
 
     return scores_df
 
@@ -144,8 +144,8 @@ def save_pred(
     name = name[0]
 
     norm_params = norm_params.detach().numpy()
-    min_value, perc99_value = norm_params[0,0], norm_params[0,1]
-    data = data*(perc99_value-min_value) + min_value
+    max_value, min_value = norm_params[0,0], norm_params[0,1]
+    data = data*(max_value-min_value) + min_value
     save_dict = {
         'pred_bin': pred_bin,
         'pred': pred,

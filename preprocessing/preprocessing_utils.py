@@ -12,12 +12,13 @@ import openpyxl # for reading for excel tables
 import SimpleITK as sitk
 import torch
 import h5py
+import pandas as pd
 #%%
 # saves the given mri data as gif
 
 
 ################ Save Volumes ##########################
-def animate_img(img_data, size='small', path_to_data_analysis = "../data_analysis/", save_path = None):
+def animate_img(img_data, mask=None , size='small', path_to_data_analysis = "../data_analysis/", save_path = None):
 
     import matplotlib.animation as animate
     imgs = []
@@ -31,7 +32,9 @@ def animate_img(img_data, size='small', path_to_data_analysis = "../data_analysi
         step = 1
 
     for i in np.arange(0,img_data.shape[2], step):
-        im = plt.imshow(img_data[::step,::step,i], animated=True)
+        im = plt.imshow(img_data[::step,::step,i], animated=True, cmap='gray')
+        if mask is not None:
+            im = plt.imshow(mask[::step,::step,i], animated=True, cmap='jet', alpha=0.5)
         imgs.append([im])
 
     ani = animate.ArtistAnimation(fig, imgs, interval=100, blit=True, repeat_delay=500)
@@ -196,8 +199,10 @@ def match_labels(color_table, class_table):
 # takes data and label mappings as input and return corrected data
 def correct_labels(data, mapping):
     dtype = data.dtype
-    label_mapping = mapping[['id_in_file', 'class_id']].dropna(axis='index', how='any').astype(int).set_index('id_in_file').to_dict()['class_id']
-    # bugfix
+    if isinstance(mapping, pd.DataFrame):
+        label_mapping = mapping[['id_in_file', 'class_id']].dropna(axis='index', how='any').astype(int).set_index('id_in_file').to_dict()['class_id']
+    else:
+        label_mapping = mapping
     return map_labels(data, label_mapping).astype(int)
 
 def map_labels(data, label_mapping:dict):

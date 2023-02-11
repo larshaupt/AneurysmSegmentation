@@ -613,10 +613,9 @@ class CropForegroundCenter(object):
         self.margin = margin
         
 
-
-
         def select_target_label(x):
             return x == self.target_label
+            
         self.crop  = transforms.CropForegroundd(
             keys = ['image', 'target'], 
             select_fn =select_target_label, 
@@ -636,6 +635,8 @@ class CropForegroundCenter(object):
 
         sample = self.crop(sample)
         return sample
+
+
 
 
 
@@ -872,10 +873,3 @@ def test_transform(trans):
     return trans({"image":a,"target":b})
 
 #ret = test_transform(OneHotEncodeLabel(14))
-
-# %%
-
-# %%
-# %%
-
-# %%

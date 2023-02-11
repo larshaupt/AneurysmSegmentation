@@ -67,6 +67,7 @@ class Options:
         self.inp_dict = dict()
         self.file_cont = ""
         self.verbose = verbose
+        self.init_parser()
         
 
         if config_file == '':
@@ -176,14 +177,7 @@ class Options:
             print("\nCould not save config file. Skipping")
             print(e)
 
-    def parse_arguments(self):
-        """
-        parse_arguments method is used to parse the command line arguments for the script.
-
-        This method sets up the argument parser using the argparse module and adds various arguments for the script.
-        """
-
-
+    def init_parser(self):
         self.parser = argparse.ArgumentParser(description="Script for training a model")
         self.parser.add_argument("-ex", "--exp_path", type=str, default='', help="Path to the experiment configuration file")
 
@@ -259,7 +253,7 @@ class Options:
         self.parser.add_argument('--rand_affine', choices=("True","False"), default="True", help='Random affine transformations (default: True)')
         self.parser.add_argument('--norm_percentile', type=float, default=99.0, help='Percentile for normalization (default: 99.0)')
         self.parser.add_argument('--rand_rotate', choices=("True","False"), default="False", help='Random rotation (default: False)')
-        self.parser.add_argument('--det_val_crop', choices=("True","False"), default="False", help='Determine if the validation set will be cropped deterministically or randomly')
+        self.parser.add_argument('--det_val_crop', choices=("True","False"), default="True", help='Determine if the validation set will be cropped deterministically or randomly')
         
         # Postprocessing
         self.parser.add_argument('--margin_crop', type=int, default=32, help='Margin for cropping the validation set')
@@ -274,6 +268,14 @@ class Options:
         self.parser.add_argument('--dropout', type=float, default=0.0, help='Dropout rate for the model')
         self.parser.add_argument('--update_layers', choices=("", "all", "decoder", "norm"), default="all", help='The layers to be updated during training. Choices: all, decoder, norm')
 
+
+
+    def parse_arguments(self):
+        """
+        parse_arguments method is used to parse the command line arguments for the script.
+
+        This method sets up the argument parser using the argparse module and adds various arguments for the script.
+        """
         self.inp = self.parser.parse_args()
         
 
@@ -635,38 +637,11 @@ class Options:
         Replace missing arguments with default values.
         """
 
-        if not hasattr(self.opt, 'split_dict'):
-            self.opt.split_dict = 'k_fold_split2_val.json'
-        if not hasattr(self.opt, 'rand_rotate'):
-            self.opt.rand_rotate = False
-        if not hasattr(self.opt, 'neighboring_vessels'):
-            self.opt.neighboring_vessels = False
-        if not hasattr(self.opt, 'det_val_crop'):
-            self.opt.det_val_crop = False
-        if not hasattr(self.opt, 'val_threshold_data'):
-            self.opt.val_threshold_data = 1.0
-        if not hasattr(self.opt, 'val_threshold_cc'):
-            self.opt.val_threshold_cc = 100
-        if not hasattr(self.opt, 'pretrained_weights_dict'):
-            self.opt.pretrained_weights_dict = ""
-        if not hasattr(self.opt, 'apply_mask'):
-            self.opt.apply_mask = False
-        if not hasattr(self.opt, 'val_threshold_cc_max'):
-            self.opt.val_threshold_cc_max = -1
-        if not hasattr(self.opt, 'add_own_hausdorff'):
-            self.opt.add_own_hausdorff = False
-        if not hasattr(self.opt, 'normalization'):
-            self.opt.normalization = 'minmax'
-        if not hasattr(self.opt, 'rand_affine'):
-            self.opt.rand_affine = False
-        if not hasattr(self.opt, 'grid_validation'):
-            self.opt.grid_validation = False
-        if not hasattr(self.opt, 'num_blocks'):
-            self.opt.num_blocks = 5
-        if not hasattr(self.opt, 'metric_train'):
-            self.opt.metric_train = "reduced" 
-        if not hasattr(self.opt, 'update_layers'):
-            self.opt.update_layers = "all"
+
+        defaults = self.parser.parse_args([])
+        for key in defaults.__dict__.keys():
+            if not hasattr(self.opt, key):
+                setattr(self.opt, key, defaults.__dict__[key])
             
     def load_from_args(self):
         """

@@ -32,7 +32,7 @@ experiment_names_best_softdice = ["USZ_BrainArtery_bias_sweep_1672860983", "USZ_
 experiment_names_best_translr = ['USZ_BrainArtery_bias_sweep_1672918520', 'USZ_BrainArtery_bias_sweep_1672914714', 'USZ_BrainArtery_bias_sweep_1672914729', 'USZ_BrainArtery_bias_sweep_1672914739', 'USZ_BrainArtery_bias_sweep_1672914713']
 experiment_names_wholevol22 = ['USZ_BrainArtery_bias111_sweep_1673034756', 'USZ_BrainArtery_bias111_sweep_1673037679', 'USZ_BrainArtery_bias111_sweep_1673018837', 'USZ_BrainArtery_bias111_sweep_1673000985', 'USZ_BrainArtery_bias111_sweep_1672981931']
 experiment_names_wholevol3 = ['USZ_BrainArtery_bias111_sweep_1673023809','USZ_BrainArtery_bias111_sweep_1673007015','USZ_BrainArtery_bias111_sweep_1672989580','USZ_BrainArtery_bias111_sweep_1672970792'] #USZ_BrainArtery_bias111_sweep_1673034757
-
+experiment_names_dice_transf = ['USZ_BrainArtery_bias_sweep_1675804916_4', 'USZ_BrainArtery_bias_sweep_1675804907_1', 'USZ_BrainArtery_bias_sweep_1675804907_2', 'USZ_BrainArtery_bias_sweep_1675804907_3', 'USZ_BrainArtery_bias_sweep_1675804901_0']
 experiment_names_wholevol1 = ['USZ_BrainArtery_bias111_sweep_1673034941','USZ_BrainArtery_bias111_sweep_1673034247','USZ_BrainArtery_bias111_sweep_1673013749','USZ_BrainArtery_bias111_sweep_1672995677','USZ_BrainArtery_bias111_sweep_1672977086']
 experiment_names_wholevoldice3 = ['USZ_BrainArtery_bias111_sweep_1673135808_4',
  'USZ_BrainArtery_bias111_sweep_1673125252_3',
@@ -68,15 +68,22 @@ experiment_names_mixtrain = ['USZ_BrainArtery_bias_sweep_1673066297_4',
  'USZ_BrainArtery_bias_sweep_1672970716_1',
  'USZ_BrainArtery_bias_sweep_1672970716_2',
  'USZ_BrainArtery_bias_sweep_1672970713_0']
+experiment_names_tf_dice = ['USZ_BrainArtery_bias_sweep_1675804916_4',
+ 'USZ_BrainArtery_bias_sweep_1675804907_1',
+ 'USZ_BrainArtery_bias_sweep_1675804907_2',
+ 'USZ_BrainArtery_bias_sweep_1675804907_3',
+ 'USZ_BrainArtery_bias_sweep_1675804901_0']
 experiment_names = experiment_names_best_softdice
 
 experiment_names = [exp_n if exp_n[-2] != '_' else exp_n[:-2] for exp_n in experiment_names]
 experiment_names = experiment_names_best_bce
+experiment_names = ['USZ_BrainArtery_bias111_sweep_1673034941']
+experiment_names = experiment_names_tf_dice
 model_name = 'best_model.pth'
 pre_trained_path = '/srv/beegfs02/scratch/brain_artery/data/training/pre_trained'
 save_path = '/srv/beegfs02/scratch/brain_artery/data/training/predictions/'
 
-config_overwrite = {'val_threshold_data': 0.8, "apply_mask": False, "val_threshold_cc": 50, "val_threshold_cc_max": 10000, "crop_sides": True, 'compute_mdice': False, "add_own_hausdorff": True}
+config_overwrite = {'val_threshold_data': 0.8, "apply_mask": False, "val_threshold_cc": 50, "val_threshold_cc_max": 10000, "crop_sides": True, 'compute_mdice': False, "add_own_hausdorff": True, "det_val_crop": True}
 
 make_predictions( 
             experiment_names,
@@ -95,8 +102,8 @@ make_predictions(
             binarize_target = True,
             config_overwrite = config_overwrite,
             postprocessing= False,
-            postfix = "_softdice_best",
-            aggregation_strategy = "mean",
+            postfix = "_best_tf_dice",
+            aggregation_strategy = "max",
             factor=1.0,
             softmax=False)  
 
@@ -115,7 +122,7 @@ input_dict = {"experiment_names":experiment_names,
             "save":False,
             "binarize_target":True,
             "config_overwrite":config_overwrite,
-            "postprocessing":True,
+            "postprocessing":False,
             "postfix":"_alladam_wp",
             "softmax": False
             }

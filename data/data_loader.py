@@ -1,7 +1,7 @@
 # %%
 import imp
 import torch
-from data import NpyDataset, HDF5Dataset3D
+from data import HDF5Dataset3D
 from data import transformations as custom_tf
 from torchvision import transforms as pytorch_tf
 import nibabel as nib
@@ -42,23 +42,6 @@ def load_datasets(exp_config,
                                             norm_percentile = norm_percentile,
                                             normalization = normalization)
 
-    return train_loader, val_loader, test_loader
-
-def get_data_loaders_npy(exp_config, batch_size, path_train, path_test, path_val, tf_train, tf_val):
-    train_loader, test_loader, val_loader = None, None, None
-
-    if path_train != '':
-        ds_train = NpyDataset.NpyDataset(exp_config, path_train, tf_train)
-        train_loader = torch.utils.data.DataLoader(ds_train, batch_size = batch_size, shuffle = exp_config.shuffle_train, num_workers = 1)
-    
-    if path_test != '':
-        ds_test = NpyDataset.NpyDataset(exp_config, path_test, tf_val)
-        test_loader = torch.utils.data.DataLoader(ds_test, batch_size = batch_size, shuffle = exp_config.shuffle_test, num_workers = 1)
-    
-    if path_val != '':
-        ds_validation = NpyDataset.NpyDataset(exp_config, path_val, tf_val)
-        val_loader = torch.utils.data.DataLoader(ds_validation, batch_size = batch_size, shuffle = exp_config.shuffle_validation, num_workers = 1)
-    
     return train_loader, val_loader, test_loader
 
 def get_single_data_loader_hdf53d(exp_config, 

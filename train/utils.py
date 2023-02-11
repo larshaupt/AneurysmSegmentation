@@ -26,7 +26,7 @@ def create_directory(path):
 def load_split(path_dict:str, fold_id:int, split:str = "") -> dict|list:
     if not os.path.exists(path_dict):
         print(path_dict)
-        raise FileNotFoundError("Split file not found. Possible splits are: "+ str(os.listdir(os.path.dirname(path_dict))))
+        raise FileNotFoundError(f"Split file {path_dict} not found. Possible splits are: "+ str(os.listdir(os.path.dirname(path_dict))))
     split_dict_df = pd.read_json(path_dict)
     fold_split = split_dict_df[fold_id]
     empty_dict = {'image':[],'target':[]}
@@ -278,8 +278,11 @@ class Predictor:
         return pred
 
     def get_exp_config(self, exp_name):
+        if exp_name[-2] == '_':
+            exp_name = exp_name[:-2]
         if not exp_name in self.models.keys():
-            raise ValueError(f'Experiment {exp_name} not loaded. Please load it first.')
+
+            raise ValueError(f'Experiment {exp_name} not loaded. Please load it first. Found {self.models.keys()}')
         return self.models[exp_name][1]
 
     def get_exp_names(self):

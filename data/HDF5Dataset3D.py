@@ -106,7 +106,7 @@ class HDF5Dataset3D(data.Dataset):
 
         patient_name_current = os.path.basename(self.image_paths[index])[:-3]
         ################ Normalization ###################
-        # scales the values between 0 and 1 
+
         index_patient = np.where(self.patient_names == patient_name_current)[0]
         if len(index_patient) == 0:
             index_patient = -1
@@ -116,6 +116,9 @@ class HDF5Dataset3D(data.Dataset):
         if index_patient != -1:
             min_value = self.data_min[index_patient]
             max_value = self.data_max[index_patient]
+        else:
+            min_value = np.min(x)
+            max_value = np.max(x)
 
         # Z Score Normalization
         if self.normalization == 'z' or self.normalization == 'zscore':
